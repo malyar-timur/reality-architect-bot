@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use teloxide::prelude::*;
-use teloxide::types::{ChatAction, InputFile, ParseMode};
+use teloxide::types::{ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, ParseMode};
 use tracing::error;
 
 use crate::ai::prompts::{
@@ -76,6 +76,30 @@ pub async fn handle_message(
     }
 
     // Обработка разрешенных команд
+    if text == "/admin" || text == "/panel" {
+        let is_admin = username.as_deref() == Some("Studia_taro");
+
+        if is_admin {
+            let admin_kb = InlineKeyboardMarkup::new(vec![
+                vec![
+                    InlineKeyboardButton::callback("📊 Статистика", "admin:stats"),
+                    InlineKeyboardButton::callback("🔒 Whitelist статус", "admin:whitelist"),
+                ],
+                vec![InlineKeyboardButton::callback("🏠 В главное меню", "nav:main")],
+            ]);
+
+            let _ = bot.send_message(
+                msg.chat.id,
+                "👑 <b>Панель управления Архитектора</b>\n\n\
+                Здесь доступны административные функции и управление базой пользователей:",
+            )
+            .parse_mode(ParseMode::Html)
+            .reply_markup(admin_kb)
+            .await;
+            return Ok(());
+        }
+    }
+
     if text == "/start" || text == "/menu" {
         send_main_menu(&bot, msg.chat.id, &db_user.first_name, db_user.energy_balance).await?;
         return Ok(());
@@ -427,6 +451,24 @@ pub async fn handle_callback(
         let _ = bot.edit_message_text(chat_id, message_id, text)
             .parse_mode(ParseMode::Html)
             .reply_markup(settings_keyboard(true, true))
+            .await;
+        return Ok(());
+    }
+
+    if data == "admin:stats" {
+        let text = format!("📊 <b>Статистика бота</b>\n\n🗄 База: SQLite (bot.db)\n🔒 Whitelist: <b>@{}</b>", config.allowed_username.as_deref().unwrap_or("Все"));
+        let _ = bot.edit_message_text(chat_id, message_id, text)
+            .parse_mode(ParseMode::Html)
+            .reply_markup(InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback("⬅ Назад", "nav:main")]]))
+            .await;
+        return Ok(());
+    }
+
+    if data == "admin:whitelist" {
+        let text = format!("🔒 <b>Whitelist статус</b>\n\nТекущий разрешенный пользователь: <b>@{}</b>\n\n<i>Чтобы изменить пользователя или открыть доступ всем, укажите ALLOWED_USERNAME в .env файле.</i>", config.allowed_username.as_deref().unwrap_or("Все"));
+        let _ = bot.edit_message_text(chat_id, message_id, text)
+            .parse_mode(ParseMode::Html)
+            .reply_markup(InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback("⬅ Назад", "nav:main")]]))
             .await;
         return Ok(());
     }

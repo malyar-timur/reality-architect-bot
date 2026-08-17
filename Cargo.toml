@@ -4,18 +4,6 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Senior Rust Developer"]
 
-[lib]
-name = "telegram_bot"
-path = "src/lib.rs"
-
-[[bin]]
-name = "telegram_bot"
-path = "src/main.rs"
-
-[[bin]]
-name = "admin_bot"
-path = "src/bin/admin_bot.rs"
-
 [dependencies]
 teloxide = { version = "0.13", features = ["macros"] }
 tokio = { version = "1.38", features = ["full"] }
