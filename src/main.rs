@@ -3,6 +3,7 @@ use teloxide::prelude::*;
 use tracing::info;
 
 mod ai;
+mod admin_handlers;
 mod config;
 mod db;
 mod esoterics;
@@ -12,6 +13,7 @@ mod models;
 mod offer;
 mod states;
 
+use admin_handlers::{handle_admin_callback, handle_admin_message};
 use ai::AiClient;
 use config::Config;
 use db::Db;
@@ -23,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::from_env()?;
     config.init_logging();
 
-    info!("Starting Sacred Divination AI Telegram Bot...");
+    info!("Starting Sacred Divination AI Telegram Bots Engine...");
     config.validate()?;
 
     // 2. Инициализация базы данных SQLite
@@ -43,29 +45,39 @@ async fn main() -> anyhow::Result<()> {
     let ai_arc = Arc::new(ai_client);
     let config_arc = Arc::new(config.clone());
 
-    // 4. Инициализация Telegram Бота
-    let bot = Bot::new(&config.teloxide_token);
+    // 4. Инициализация 1-го бота: БОТ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ (@arch_reality_2026_bot)
+    let user_bot = Bot::new(&config.teloxide_token);
+    let user_handler = dptree::entry()
+        .branch(Update::filter_message().endpoint(handle_message))
+        .branch(Update::filter_callback_query().endpoint(handle_callback));
 
-    // 5. Построение дерева диспетчеризации (dptree)
-    let handler = dptree::entry()
-        .branch(
-            Update::filter_message()
-                .endpoint(handle_message),
-        )
-        .branch(
-            Update::filter_callback_query()
-                .endpoint(handle_callback),
-        );
-
-    info!("Bot dispatcher started. Listening for events...");
-
-    Dispatcher::builder(bot, handler)
-        .dependencies(dptree::deps![db_arc, ai_arc, config_arc])
+    let mut user_dispatcher = Dispatcher::builder(user_bot, user_handler)
+        .dependencies(dptree::deps![db_arc.clone(), ai_arc.clone(), config_arc.clone()])
         .enable_ctrlc_handler()
-        .build()
-        .dispatch()
-        .await;
+        .build();
 
-    info!("Bot shutdown complete.");
+    // 5. Инициализация 2-го бота: БОТ ДЛЯ НАСТРОЕК И АДМИНКИ (@arch_settings_bot)
+    let admin_bot_token = std::env::var("ADMIN_BOT_TOKEN").unwrap_or_else(|_| config.teloxide_token.clone());
+    let admin_bot = Bot::new(&admin_bot_token);
+    let admin_handler = dptree::entry()
+        .branch(Update::filter_message().endpoint(handle_admin_message))
+        .branch(Update::filter_callback_query().endpoint(handle_admin_callback));
+
+    let mut admin_dispatcher = Dispatcher::builder(admin_bot, admin_handler)
+        .dependencies(dptree::deps![db_arc.clone(), ai_arc.clone(), config_arc.clone()])
+        .enable_ctrlc_handler()
+        .build();
+
+    info!("🚀 ОБОИХ БОТОВ УСПЕШНО ЗАПУСКАЕМ ОДНОВРЕМЕННО:");
+    info!("1. Бот пользователей: @arch_reality_2026_bot");
+    info!("2. Бот настроек/админки: @arch_settings_bot");
+
+    // 6. Одновременный запуск двух ботов через tokio::join
+    tokio::select! {
+        _ = user_dispatcher.dispatch() => info!("User bot stopped"),
+        _ = admin_dispatcher.dispatch() => info!("Admin bot stopped"),
+    }
+
+    info!("Bots shutdown complete.");
     Ok(())
 }
