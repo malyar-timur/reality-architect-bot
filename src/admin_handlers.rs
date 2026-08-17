@@ -19,10 +19,7 @@ pub async fn handle_admin_message(
     let is_authorized = config.is_admin(username);
 
     if !is_authorized {
-        let _ = bot.send_message(
-            msg.chat.id,
-            "⛔ <b>Доступ запрещен</b>\n\nЭтот бот настроек предназначен исключительно для администраторов из файла конфигурации (.env).",
-        ).parse_mode(ParseMode::Html).await;
+        // Полный игнор посторонних пользователей (бот вообще молчит и не отвечает)
         return Ok(());
     }
 
@@ -71,7 +68,7 @@ pub async fn handle_admin_callback(
     let is_authorized = config.is_admin(username);
 
     if !is_authorized {
-        let _ = bot.answer_callback_query(q.id).text("⛔ Доступ запрещен для вашего аккаунта").await;
+        // Полный игнор посторонних пользователей
         return Ok(());
     }
 

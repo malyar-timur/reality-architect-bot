@@ -27,7 +27,7 @@ impl Db {
                 last_name TEXT,
                 is_offer_accepted BOOLEAN NOT NULL DEFAULT 0,
                 offer_accepted_at DATETIME,
-                energy_balance INTEGER NOT NULL DEFAULT 3,
+                energy_balance INTEGER NOT NULL DEFAULT 10,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 last_active_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
@@ -93,6 +93,15 @@ impl Db {
         .await?;
 
         Ok(user)
+    }
+
+    /// Установить точное количество раскладов всем или конкретному пользователю
+    pub async fn set_all_users_spreads(&self, count: i64) -> Result<()> {
+        sqlx::query("UPDATE users SET energy_balance = $1")
+            .bind(count)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 
     /// Получить всех пользователей для админки

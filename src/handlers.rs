@@ -200,6 +200,25 @@ pub async fn handle_callback(
 
     let _ = bot.answer_callback_query(q.id).await;
 
+    if data == "nav:main" {
+        let (_can_read, remaining) = match db.can_make_free_reading(user_id, config.max_free_lifetime_readings).await {
+            Ok(res) => res,
+            Err(_) => (true, 10),
+        };
+        let text = format!(
+            "✨ <b>Главное меню ORACULUM</b>\n\n\
+            🔮 Добро пожаловать в пространство сакральных знаний и ИИ-Оракула.\n\n\
+            🎁 Доступно бесплатных раскладов: <b>{} из 10</b>\n\n\
+            Выберите интересующий вас раздел:",
+            remaining
+        );
+        let _ = bot.edit_message_text(chat_id, message_id, text)
+            .parse_mode(ParseMode::Html)
+            .reply_markup(main_menu_keyboard())
+            .await;
+        return Ok(());
+    }
+
     // 2. Навигация по разделам
     if data == "nav:legal" {
         let text = "⚖️ <b>Правовая информация сервиса ORACULUM</b>\n\n\
@@ -567,7 +586,6 @@ pub async fn handle_callback(
                 return Ok(());
             }
 
-            // Проверяем лимит 10 бесплатных раскладов
             let (can_read, remaining) = match db.can_make_free_reading(user_id, config.max_free_lifetime_readings).await {
                 Ok(res) => res,
                 Err(_) => (true, 10),
