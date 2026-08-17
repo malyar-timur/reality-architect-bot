@@ -95,6 +95,14 @@ impl Db {
         Ok(user)
     }
 
+    /// Получить всех пользователей для админки
+    pub async fn get_all_users(&self) -> Result<Vec<User>> {
+        let users = sqlx::query_as::<_, User>("SELECT * FROM users ORDER BY created_at DESC")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(users)
+    }
+
     /// Получить пользователя по Telegram ID
     pub async fn get_user_by_telegram_id(&self, telegram_id: i64) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
