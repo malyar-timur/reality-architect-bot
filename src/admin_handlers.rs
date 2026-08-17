@@ -15,16 +15,13 @@ pub async fn handle_admin_message(
         None => return Ok(()),
     };
 
-    let username = user.username.as_deref().unwrap_or("");
-    let is_authorized = match &config.allowed_username {
-        Some(allowed) => username.eq_ignore_ascii_case(allowed),
-        None => true,
-    };
+    let username = user.username.as_deref();
+    let is_authorized = config.is_admin(username);
 
     if !is_authorized {
         let _ = bot.send_message(
             msg.chat.id,
-            "⛔ <b>Доступ запрещен</b>\n\nЭтот бот настроек предназначен исключительно для администратора (@Studia_taro).",
+            "⛔ <b>Доступ запрещен</b>\n\nЭтот бот настроек предназначен исключительно для администраторов из файла конфигурации (.env).",
         ).parse_mode(ParseMode::Html).await;
         return Ok(());
     }
@@ -70,14 +67,11 @@ pub async fn handle_admin_callback(
         None => return Ok(()),
     };
 
-    let username = q.from.username.as_deref().unwrap_or("");
-    let is_authorized = match &config.allowed_username {
-        Some(allowed) => username.eq_ignore_ascii_case(allowed),
-        None => true,
-    };
+    let username = q.from.username.as_deref();
+    let is_authorized = config.is_admin(username);
 
     if !is_authorized {
-        let _ = bot.answer_callback_query(q.id).text("⛔ Доступ запрещен").await;
+        let _ = bot.answer_callback_query(q.id).text("⛔ Доступ запрещен для вашего аккаунта").await;
         return Ok(());
     }
 

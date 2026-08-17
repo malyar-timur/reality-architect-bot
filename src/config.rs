@@ -14,6 +14,9 @@ pub struct Config {
     pub daily_free_readings: i32,
     pub max_free_lifetime_readings: i32,
     pub allowed_username: Option<String>,
+    pub admin_usernames: Vec<String>,
+    pub user_bot_name: String,
+    pub admin_bot_name: String,
 }
 
 impl Config {
@@ -51,11 +54,22 @@ impl Config {
             .and_then(|s| s.parse().ok())
             .unwrap_or(10);
 
-        // Белый список (Whitelist) - по умолчанию доступ только для @Studia_taro
-        // Можно указать другой username в .env через ALLOWED_USERNAME=другой_юзер
-        let allowed_username = env::var("ALLOWED_USERNAME")
-            .ok()
-            .or_else(|| Some("Studia_taro".to_string()));
+        // Белый список пользователей
+        let allowed_username = env::var("ALLOWED_USERNAME").ok();
+
+        // Список администраторов через запятую (например: ADMIN_USERNAMES=mixanik2000,Studia_taro)
+        let admin_usernames = env::var("ADMIN_USERNAMES")
+            .unwrap_or_else(|_| "mixanik2000,Studia_taro".to_string())
+            .split(',')
+            .map(|s| s.trim().trim_start_matches('@').to_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        // Имена ботов из .env
+        let user_bot_name = env::var("USER_BOT_NAME")
+            .unwrap_or_else(|_| "arch_reality_2026_bot".to_string());
+        let admin_bot_name = env::var("ADMIN_BOT_NAME")
+            .unwrap_or_else(|_| "arch_settings_bot".to_string());
 
         Ok(Self {
             teloxide_token,
@@ -67,7 +81,19 @@ impl Config {
             daily_free_readings,
             max_free_lifetime_readings,
             allowed_username,
+            admin_usernames,
+            user_bot_name,
+            admin_bot_name,
         })
+    }
+
+    /// Проверка, является ли пользователь администратором
+    pub fn is_admin(&self, username: Option<&str>) -> bool {
+        if let Some(name) = username {
+            let clean = name.trim_start_matches('@').to_lowercase();
+            return self.admin_usernames.iter().any(|adm| adm == &clean);
+        }
+        false
     }
 
     /// Инициализация логирования tracing
