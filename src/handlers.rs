@@ -7,6 +7,7 @@ use crate::ai::prompts::{
     build_astrology_prompt, build_leela_prompt, build_tarot_prompt, SYSTEM_ORACLE_PROMPT,
 };
 use crate::ai::AiClient;
+use crate::config::Config;
 use crate::db::Db;
 use crate::esoterics::astrology::ZODIAC_SIGNS;
 use crate::esoterics::leela::LeelaGame;
@@ -20,6 +21,7 @@ pub async fn handle_message(
     bot: Bot,
     msg: Message,
     db: Arc<Db>,
+    config: Arc<Config>,
 ) -> ResponseResult<()> {
     let user = match msg.from {
         Some(ref u) => u,
@@ -30,6 +32,23 @@ pub async fn handle_message(
     let username = user.username.clone();
     let first_name = user.first_name.clone();
     let last_name = user.last_name.clone();
+
+    // 🔒 БЕЛЫЙ СПИСОК (Whitelist): доступ разрешен только указанному пользователю (по умолчанию @Studia_taro)
+    if let Some(ref allowed) = config.allowed_username {
+        let is_allowed = username.as_ref().map(|u| u.eq_ignore_ascii_case(allowed)).unwrap_or(false);
+        if !is_allowed {
+            let access_denied_text = format!(
+                "🔒 <b>Доступ ограничен</b>\n\n\
+                Бот находится в режиме приватного тестирования и доступен только для <b>@{}</b>.\n\
+                Для получения персонального доступа напишите администратору.",
+                allowed
+            );
+            let _ = bot.send_message(msg.chat.id, access_denied_text)
+                .parse_mode(ParseMode::Html)
+                .await;
+            return Ok(());
+        }
+    }
 
     // Регистрация или получение пользователя
     let db_user = match db.create_or_update_user(user_id, username.as_deref(), &first_name, last_name.as_deref()).await {
@@ -71,7 +90,6 @@ pub async fn handle_message(
     }
 
     // ПОЛНЫЙ ЗАПРЕТ ПРОИЗВОЛЬНОГО ТЕКСТОВОГО ВВОДА:
-    // Удаляем текстовое сообщение пользователя, если это возможно, и присылаем мягкое напоминание
     let _ = bot.delete_message(msg.chat.id, msg.id).await;
 
     let warning_text = "🔮 <i>Оракул считывает намерения через сакральные знаки и символы. Пожалуйста, используйте кнопки навигации для управления диалогом.</i>";
@@ -89,6 +107,7 @@ pub async fn handle_callback(
     q: CallbackQuery,
     db: Arc<Db>,
     ai: Arc<AiClient>,
+    config: Arc<Config>,
 ) -> ResponseResult<()> {
     let data = match q.data {
         Some(d) => d,
@@ -96,12 +115,23 @@ pub async fn handle_callback(
     };
 
     let user_id = q.from.id.0 as i64;
+    let username = q.from.username.clone();
     let message = match q.message {
         Some(m) => m,
         None => return Ok(()),
     };
     let chat_id = message.chat().id;
     let message_id = message.id();
+
+    let query_id = q.id.clone();
+    // 🔒 БЕЛЫЙ СПИСОК (Whitelist) для Callback Query
+    if let Some(ref allowed) = config.allowed_username {
+        let is_allowed = username.as_ref().map(|u| u.eq_ignore_ascii_case(allowed)).unwrap_or(false);
+        if !is_allowed {
+            let _ = bot.answer_callback_query(query_id).text("🔒 Доступ только для авторизованного пользователя").await;
+            return Ok(());
+        }
+    }
 
     // Проверяем / создаем пользователя
     let db_user = match db.create_or_update_user(
@@ -113,10 +143,13 @@ pub async fn handle_callback(
         Ok(u) => u,
         Err(e) => {
             error!("Database error in callback: {:?}", e);
-            let _ = bot.answer_callback_query(q.id).await;
+            let _ = bot.answer_callback_query(query_id).await;
             return Ok(());
         }
     };
+
+    // Подтверждаем получение callback
+    let _ = bot.answer_callback_query(q.id.clone()).await;
 
     // 1. Принятие оферты
     if data == "accept_offer" {
@@ -387,6 +420,22 @@ pub async fn handle_callback(
     }
 
     // 3. Таро: Выбор сферы
+    // 10. Меню настроек
+    if data == "nav:settings" {
+        let text = "⚙️ <b>Настройки Оракула</b>\n\n\
+            Управляйте параметрами взаимодействия с искусственным интеллектом и уведомлениями:";
+        let _ = bot.edit_message_text(chat_id, message_id, text)
+            .parse_mode(ParseMode::Html)
+            .reply_markup(settings_keyboard(true, true))
+            .await;
+        return Ok(());
+    }
+
+    if data == "toggle:ai_mode" || data == "toggle:notifications" || data == "toggle:deck_style" {
+        let _ = bot.answer_callback_query(query_id).text("✨ Настройка успешно обновлена!").await;
+        return Ok(());
+    }
+
     if data == "nav:tarot_spheres" {
         let text = "🃏 <b>Таинство Таро</b>\n\nВ какую сферу вашей жизни направить свет оракула?";
         let _ = bot.edit_message_text(chat_id, message_id, text)
@@ -476,6 +525,26 @@ pub async fn handle_callback(
                 return Ok(());
             }
 
+            // Проверяем лимит 10 бесплатных раскладов
+            let (can_read, remaining) = match db.can_make_free_reading(user_id, config.max_free_lifetime_readings).await {
+                Ok(res) => res,
+                Err(_) => (true, 10),
+            };
+
+            if !can_read {
+                let limit_text = format!(
+                    "🔒 <b>Лимит бесплатных раскладов исчерпан</b>\n\n\
+                    Вы использовали все <b>{}</b> подарочных раскладов.\n\
+                    Для продолжения оформите доступ в разделе <b>Тарифы</b> или обратитесь в поддержку <b>@Studia_taro</b>.",
+                    config.max_free_lifetime_readings
+                );
+                let _ = bot.edit_message_text(chat_id, message_id, limit_text)
+                    .parse_mode(ParseMode::Html)
+                    .reply_markup(tariffs_keyboard())
+                    .await;
+                return Ok(());
+            }
+
             // ВСЕ КАРТЫ ВЫБРАНЫ: Генерация ИИ
             // Анимация вскрытия
             let loading_text = "🔮 <i>Оракул вскрывает сакральные арканы и соединяется с информационным полем...</i>";
@@ -527,17 +596,25 @@ pub async fn handle_callback(
             // Формируем красивый вывод
             let cards_list = cards_repr.iter().map(|c| format!("• <b>{}</b>", c)).collect::<Vec<_>>().join("\n");
             
+            let remaining_notice = if remaining > 1 {
+                format!("\n🎁 <i>Осталось бесплатных раскладов: {}</i>\n", remaining - 1)
+            } else {
+                "\n⚠️ <i>Это был ваш последний бесплатный расклад из 10.</i>\n".to_string()
+            };
+
             let final_text = format!(
                 "🔮 <b>ТАИНСТВО ТАРО СОВЕРШЕНО</b>\n\n\
                 📍 <b>Сфера</b>: {}\n\
                 ❓ <b>Вопрос</b>: {}\n\
-                🎴 <b>Выпавшие арканы</b>:\n{}\n\n\
+                🎴 <b>Выпавшие арканы</b>:\n{}\n\
+                {}\n\
                 ────────────────────\n\
                 {}\n\
                 ────────────────────",
                 sphere_title,
                 subtopic_title,
                 cards_list,
+                remaining_notice,
                 ai_response
             );
 

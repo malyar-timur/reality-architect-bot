@@ -136,6 +136,26 @@ impl Db {
         Ok(())
     }
 
+    /// Проверка: осталось ли у пользователя право на бесплатный расклад (лимит 10 раскладов)
+    pub async fn can_make_free_reading(&self, telegram_id: i64, max_free: i32) -> Result<(bool, i32)> {
+        let count: i32 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM readings_history WHERE user_id = $1"
+        )
+        .bind(telegram_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        let remaining = max_free - count;
+        if remaining > 0 {
+            Ok((true, remaining))
+        } else {
+            // Проверяем баланс энергии если бесплатные 10 закончились
+            let user = self.get_user_by_telegram_id(telegram_id).await?;
+            let has_energy = user.map(|u| u.energy_balance > 0).unwrap_or(false);
+            Ok((has_energy, remaining))
+        }
+    }
+
     /// Проверка и списание энергии или учет ежедневного лимита
     pub async fn can_make_reading(&self, telegram_id: i64, daily_max: i32) -> Result<bool> {
         let today = Utc::now().format("%Y-%m-%d").to_string();

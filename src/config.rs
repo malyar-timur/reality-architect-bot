@@ -12,6 +12,8 @@ pub struct Config {
     pub ai_model: String,
     pub ai_timeout_secs: u64,
     pub daily_free_readings: i32,
+    pub max_free_lifetime_readings: i32,
+    pub allowed_username: Option<String>,
 }
 
 impl Config {
@@ -43,6 +45,18 @@ impl Config {
             .and_then(|s| s.parse().ok())
             .unwrap_or(3);
 
+        // Лимит 10 бесплатных раскладов на пользователя
+        let max_free_lifetime_readings = env::var("MAX_FREE_READINGS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(10);
+
+        // Белый список (Whitelist) - по умолчанию доступ только для @Studia_taro
+        // Можно указать другой username в .env через ALLOWED_USERNAME=другой_юзер
+        let allowed_username = env::var("ALLOWED_USERNAME")
+            .ok()
+            .or_else(|| Some("Studia_taro".to_string()));
+
         Ok(Self {
             teloxide_token,
             database_url,
@@ -51,6 +65,8 @@ impl Config {
             ai_model,
             ai_timeout_secs,
             daily_free_readings,
+            max_free_lifetime_readings,
+            allowed_username,
         })
     }
 

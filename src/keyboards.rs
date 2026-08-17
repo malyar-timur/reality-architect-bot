@@ -33,6 +33,9 @@ pub fn main_menu_keyboard() -> InlineKeyboardMarkup {
         ],
         vec![
             InlineKeyboardButton::callback("👤 Профиль", "nav:profile"),
+            InlineKeyboardButton::callback("⚙️ Настройки", "nav:settings"),
+        ],
+        vec![
             InlineKeyboardButton::callback("🛟 Поддержка", "nav:support"),
         ],
     ])
@@ -100,13 +103,17 @@ pub fn tarot_pick_cards_keyboard(
 ) -> InlineKeyboardMarkup {
     let mut rows = Vec::new();
     
-    // 6 виртуальных карт в 2 ряда по 3
+    // 6 виртуальных карт в 2 ряда по 3 с красивыми названиями карт колоды
+    let card_labels = [
+        "🃏 Карта I", "🔮 Карта II", "✨ Карта III",
+        "🌙 Карта IV", "☀️ Карта V", "⭐ Карта VI"
+    ];
     let mut row1 = Vec::new();
     let mut row2 = Vec::new();
 
     for i in 0..6 {
         let is_picked = picked_indices.contains(&i);
-        let label = if is_picked { "✨ Открыта" } else { "🎴 Карточка" };
+        let label = if is_picked { "✨ Открыта" } else { card_labels[i] };
         let callback = if is_picked {
             "noop".to_string()
         } else {
@@ -131,6 +138,27 @@ pub fn tarot_pick_cards_keyboard(
     ]);
 
     InlineKeyboardMarkup::new(rows)
+}
+
+/// Клавиатура настроек бота (Settings)
+pub fn settings_keyboard(is_ai_enhanced: bool, notifications_enabled: bool) -> InlineKeyboardMarkup {
+    let ai_text = if is_ai_enhanced { "🧠 ИИ-Анализ: Вкл ✅" } else { "🧠 ИИ-Анализ: Выкл ❌" };
+    let notif_text = if notifications_enabled { "🔔 Утренний Оракул: Вкл ✅" } else { "🔔 Утренний Оракул: Выкл ❌" };
+
+    InlineKeyboardMarkup::new(vec![
+        vec![
+            InlineKeyboardButton::callback(ai_text, "toggle:ai_mode"),
+        ],
+        vec![
+            InlineKeyboardButton::callback(notif_text, "toggle:notifications"),
+        ],
+        vec![
+            InlineKeyboardButton::callback("🎴 Стиль колоды: Классика Уэйта", "toggle:deck_style"),
+        ],
+        vec![
+            InlineKeyboardButton::callback("🏠 Главное меню", "nav:main_menu"),
+        ],
+    ])
 }
 
 /// Выбор знака Зодиака

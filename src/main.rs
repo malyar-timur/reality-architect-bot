@@ -41,6 +41,7 @@ async fn main() -> anyhow::Result<()> {
 
     let db_arc = Arc::new(db);
     let ai_arc = Arc::new(ai_client);
+    let config_arc = Arc::new(config.clone());
 
     // 4. Инициализация Telegram Бота
     let bot = Bot::new(&config.teloxide_token);
@@ -59,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Bot dispatcher started. Listening for events...");
 
     Dispatcher::builder(bot, handler)
-        .dependencies(dptree::deps![db_arc, ai_arc])
+        .dependencies(dptree::deps![db_arc, ai_arc, config_arc])
         .enable_ctrlc_handler()
         .build()
         .dispatch()
