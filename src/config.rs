@@ -1,0 +1,81 @@
+use anyhow::{bail, Context, Result};
+use std::env;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+pub struct Config {
+    pub teloxide_token: String,
+    pub database_url: String,
+    pub ai_base_url: String,
+    pub ai_api_key: String,
+    pub ai_model: String,
+    pub ai_timeout_secs: u64,
+    pub daily_free_readings: i32,
+}
+
+impl Config {
+    pub fn from_env() -> Result<Self> {
+        dotenvy::dotenv().ok();
+
+        let teloxide_token = env::var("TELOXIDE_TOKEN")
+            .context("TELOXIDE_TOKEN must be set in .env or environment")?;
+
+        let database_url = env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "sqlite://bot.db?mode=rwc".to_string());
+
+        let ai_base_url = env::var("AI_BASE_URL")
+            .unwrap_or_else(|_| "http://192.124.181.128:8045/v1".to_string());
+
+        let ai_api_key = env::var("AI_API_KEY")
+            .context("AI_API_KEY must be set in .env or environment")?;
+
+        let ai_model = env::var("AI_MODEL")
+            .unwrap_or_else(|_| "gemini-3.7-flash-high".to_string());
+
+        let ai_timeout_secs = env::var("AI_TIMEOUT_SECS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(60);
+
+        let daily_free_readings = env::var("DAILY_FREE_READINGS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(3);
+
+        Ok(Self {
+            teloxide_token,
+            database_url,
+            ai_base_url,
+            ai_api_key,
+            ai_model,
+            ai_timeout_secs,
+            daily_free_readings,
+        })
+    }
+
+    /// Инициализация логирования tracing
+    pub fn init_logging(&self) {
+        let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| "telegram_bot=info,teloxide=info".into());
+
+        let _ = tracing_subscriber::registry()
+            .with(env_filter)
+            .with(tracing_subscriber::fmt::layer())
+            .try_init();
+    }
+
+    /// Валидация ключевых параметров
+    pub fn validate(&self) -> Result<()> {
+        if self.teloxide_token.trim().is_empty() {
+            bail!("Telegram bot token cannot be empty");
+        }
+        if self.ai_api_key.trim().is_empty() {
+            bail!("AI API key cannot be empty");
+        }
+        if self.ai_base_url.trim().is_empty() {
+            bail!("AI Base URL cannot be empty");
+        }
+        Ok(())
+    }
+}
