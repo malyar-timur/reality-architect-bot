@@ -199,20 +199,23 @@ pub async fn handle_callback(
         let text = "🧿 <b>Личное обращение к тарологу</b>\n\n\
             Отправьте личный вопрос тарологу. После обращения она сможет открыть диалог с вами; формат и стоимость дальнейшей консультации обсуждаются лично.\n\n\
             Стоимость первого обращения: <b>100 ₽</b>.\n\
-            После оплаты вы сможете отправить сообщение. Дальнейший формат консультации и её стоимость таролог обсудит с вами лично.";
+            После оплаты вы сможете отправить сообщение. Дальнейший формат консультации и её стоимость таролог обсудит с вами лично.\n\n\
+            Для связи напишите в поддержку: <b>@Studia_taro</b>";
         let _ = bot.edit_message_text(chat_id, message_id, text)
             .parse_mode(ParseMode::Html)
-            .reply_markup(contact_tarologist_keyboard(None))
+            .reply_markup(support_keyboard())
             .await;
         return Ok(());
     }
 
     if data == "nav:tariffs" {
         let text = "💎 <b>Тарифы и подписка ORACULUM</b>\n\n\
-            Пополняйте запасы энергии или активируйте безлимитный доступ к раскладам ИИ-Оракула без ограничений:\n\n\
-            • ⚡ <b>Пакет «5 Раскладов»</b> — 190 ₽\n\
-            • 🌟 <b>Месячный безлимит «Адепт»</b> — 590 ₽ / месяц\n\n\
-            <i>Оплата принимается через СБП, карты РФ и ЮMoney.</i>";
+            Пополняйте запасы энергии или активируйте безлимитный доступ к раскладам ИИ-Оракула:\n\n\
+            • ⚡ <b>Пакет «5 Раскладов»</b> — 290 ₽\n\
+            • 🌟 <b>Месячный безлимит «Адепт»</b> — 790 ₽ / месяц\n\
+            • 💫 <b>Безлимит «Маг» (3 месяца)</b> — 1990 ₽\n\
+            • 🔮 <b>Безлимит «Верховная Жрица» (год)</b> — 5990 ₽\n\n\
+            <i>Оплата принимается через СБП, карты РФ и ЮMoney. Для подключения напишите в поддержку @Studia_taro</i>.";
         let _ = bot.edit_message_text(chat_id, message_id, text)
             .parse_mode(ParseMode::Html)
             .reply_markup(tariffs_keyboard())
@@ -220,9 +223,37 @@ pub async fn handle_callback(
         return Ok(());
     }
 
+    // Обработка оплаты тарифов - заглушка с перенаправлением в поддержку
+    if data == "pay:pack_5" || data == "pay:sub_month" || data == "pay:sub_3months" || data == "pay:sub_year" {
+        let (tariff_name, price) = if data == "pay:pack_5" {
+            ("Пакет «5 Раскладов»", "290 ₽")
+        } else if data == "pay:sub_month" {
+            ("Безлимит «Адепт» (месяц)", "790 ₽")
+        } else if data == "pay:sub_3months" {
+            ("Безлимит «Маг» (3 месяца)", "1990 ₽")
+        } else {
+            ("Безлимит «Верховная Жрица» (год)", "5990 ₽")
+        };
+        
+        let text = format!(
+            "💎 <b>Выбран тариф: {}</b>\n\n\
+            Стоимость: <b>{}</b>\n\n\
+            Для подключения этого тарифа пожалуйста напишите в нашу службу поддержки:\n\
+            @Studia_taro\n\n\
+            Укажите желаемый тариф и способ оплаты (СБП, карта РФ, ЮMoney).",
+            tariff_name, price
+        );
+        let _ = bot.edit_message_text(chat_id, message_id, text)
+            .parse_mode(ParseMode::Html)
+            .reply_markup(support_keyboard())
+            .await;
+        return Ok(());
+    }
+
     if data == "nav:support" {
         let text = "🛟 <b>Служба заботы и поддержки</b>\n\n\
-            Если у вас возникли сложности с оплатой, работой сервиса или персональным разбором таролога — наша служба поддержки готова вам помочь.";
+            Если у вас возникли сложности с оплатой, работой сервиса или персональным разбором таролога — наша служба поддержки готова вам помочь.\n\n\
+            Напишите нам напрямую в Telegram: <b>@Studia_taro</b>";
         let _ = bot.edit_message_text(chat_id, message_id, text)
             .parse_mode(ParseMode::Html)
             .reply_markup(support_keyboard())
@@ -249,7 +280,7 @@ pub async fn handle_callback(
         }
         let _ = bot.edit_message_text(chat_id, message_id, text)
             .parse_mode(ParseMode::Html)
-            .reply_markup(support_keyboard())
+            .reply_markup(main_menu_keyboard())
             .await;
         return Ok(());
     }
@@ -268,7 +299,7 @@ pub async fn handle_callback(
     }
 
     if data == "nav:card_of_the_day" {
-        // Быстрый запуск расклада Карта Дня
+        // Быстрый запуск расклада Карта Дня - Оракул открывает Аркан вашего сегодняшнего дня
         let drawn = TarotDeck::draw_cards(1);
         let (card, is_reversed) = &drawn[0];
         let orientation = if *is_reversed { " (Перевернутая)" } else { " (Прямая)" };
@@ -292,7 +323,10 @@ pub async fn handle_callback(
         }
 
         let caption = format!(
-            "🌙 <b>Карта Дня: {}{}</b>\n\n{}\n\n<i>Ключевые энергии: {}</i>",
+            "🌙 <b>Оракул открывает Аркан вашего сегодняшнего дня: {}{}</b>\n\n\
+            🔮 <b>Совет Оракула:</b>\n\
+            {}\n\n\
+            <i>Ключевые энергии: {}</i>",
             card.name,
             orientation,
             ai_result,
@@ -302,7 +336,7 @@ pub async fn handle_callback(
         let _ = bot.send_photo(chat_id, InputFile::url(card.image_url.parse().unwrap()))
             .caption(caption)
             .parse_mode(ParseMode::Html)
-            .reply_markup(contact_tarologist_keyboard(None))
+            .reply_markup(main_menu_keyboard())
             .await;
         return Ok(());
     }

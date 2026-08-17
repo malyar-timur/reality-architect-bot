@@ -21,21 +21,18 @@ pub fn main_menu_keyboard() -> InlineKeyboardMarkup {
             InlineKeyboardButton::callback("🔮 Сделать расклад Таро", "nav:tarot_spheres"),
         ],
         vec![
-            InlineKeyboardButton::callback("🌙 Карта дня", "nav:card_of_the_day"),
-            InlineKeyboardButton::callback("🌌 Астрология", "nav:astrology"),
+            InlineKeyboardButton::callback("🌙 Оракул: Карта дня", "nav:card_of_the_day"),
         ],
         vec![
+            InlineKeyboardButton::callback("🌌 Астрология", "nav:astrology"),
             InlineKeyboardButton::callback("🎲 Игра Лила", "nav:leela"),
         ],
         vec![
-            InlineKeyboardButton::callback("💎 Тарифы и энергия", "nav:tariffs"),
-        ],
-        vec![
+            InlineKeyboardButton::callback("💎 Тарифы", "nav:tariffs"),
             InlineKeyboardButton::callback("📚 История", "nav:history"),
-            InlineKeyboardButton::callback("👤 Профиль", "nav:profile"),
         ],
         vec![
-            InlineKeyboardButton::callback("⚖️ Правовая оферта", "nav:legal"),
+            InlineKeyboardButton::callback("👤 Профиль", "nav:profile"),
             InlineKeyboardButton::callback("🛟 Поддержка", "nav:support"),
         ],
     ])
@@ -177,10 +174,16 @@ pub fn contact_tarologist_keyboard(payment_url: Option<&str>) -> InlineKeyboardM
 pub fn tariffs_keyboard() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(vec![
         vec![
-            InlineKeyboardButton::callback("⚡ 5 Раскладов — 190 ₽", "pay:pack_5"),
+            InlineKeyboardButton::callback("⚡ Пакет «5 Раскладов» — 290 ₽", "pay:pack_5"),
         ],
         vec![
-            InlineKeyboardButton::callback("🌟 Безлимит на месяц — 590 ₽", "pay:sub_month"),
+            InlineKeyboardButton::callback("🌟 Безлимит «Адепт» (месяц) — 790 ₽", "pay:sub_month"),
+        ],
+        vec![
+            InlineKeyboardButton::callback("💫 Безлимит «Маг» (3 месяца) — 1990 ₽", "pay:sub_3months"),
+        ],
+        vec![
+            InlineKeyboardButton::callback("🔮 Безлимит «Верховная Жрица» (год) — 5990 ₽", "pay:sub_year"),
         ],
         vec![
             InlineKeyboardButton::callback("← Главное меню", "nav:main_menu"),
@@ -192,7 +195,7 @@ pub fn tariffs_keyboard() -> InlineKeyboardMarkup {
 pub fn support_keyboard() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(vec![
         vec![
-            InlineKeyboardButton::url("💬 Написать в поддержку", "https://t.me/telegram".parse().unwrap()),
+            InlineKeyboardButton::url("💬 Написать в поддержку", "https://t.me/Studia_taro".parse().unwrap()),
         ],
         vec![
             InlineKeyboardButton::callback("← Главное меню", "nav:main_menu"),
