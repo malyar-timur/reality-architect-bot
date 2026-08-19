@@ -54,8 +54,13 @@ impl Config {
             .and_then(|s| s.parse().ok())
             .unwrap_or(10);
 
-        // Белый список пользователей
-        let allowed_username = env::var("ALLOWED_USERNAME").ok();
+        // Белый список пользователей (если не задан или пуст — публичный доступ)
+        let allowed_username = env::var("ALLOWED_USERNAME")
+            .ok()
+            .and_then(|s| {
+                let trimmed = s.trim().trim_start_matches('@').to_string();
+                if trimmed.is_empty() { None } else { Some(trimmed) }
+            });
 
         // Список администраторов через запятую (например: ADMIN_USERNAMES=mixanik2000,Studia_taro)
         let admin_usernames = env::var("ADMIN_USERNAMES")
@@ -91,7 +96,7 @@ impl Config {
     pub fn is_admin(&self, username: Option<&str>) -> bool {
         if let Some(name) = username {
             let clean = name.trim_start_matches('@').to_lowercase();
-            return self.admin_usernames.iter().any(|adm| adm == &clean);
+            return self.admin_usernames.iter().any(|adm| adm.trim_start_matches('@').to_lowercase() == clean);
         }
         false
     }

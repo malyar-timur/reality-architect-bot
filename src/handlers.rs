@@ -63,9 +63,11 @@ pub async fn handle_message(
 
     // Если оферта еще не принята — всегда показываем экран оферты
     if !db_user.is_offer_accepted {
+        let bot_name = format!("@{}", config.user_bot_name);
+        let raw_text = DETAILED_OFFER_TEXT.replace("@Oraculum_true_bot", &bot_name);
         let offer_intro = format!(
             "✨ <b>Добро пожаловать в Сакральный Храм Оракула</b>, {}!\n\n{}",
-            first_name, DETAILED_OFFER_TEXT
+            first_name, raw_text
         );
 
         let _ = bot.send_message(msg.chat.id, offer_intro)
@@ -106,7 +108,7 @@ pub async fn handle_message(
     }
 
     if text == "/offer" {
-        let _ = bot.send_message(msg.chat.id, DETAILED_OFFER_TEXT)
+        let _ = bot.send_message(msg.chat.id, &DETAILED_OFFER_TEXT.replace("@Oraculum_true_bot", &format!("@{}", config.user_bot_name)))
             .parse_mode(ParseMode::Html)
             .reply_markup(main_menu_keyboard())
             .await;
@@ -173,7 +175,6 @@ pub async fn handle_callback(
     };
 
     // Подтверждаем получение callback
-    let _ = bot.answer_callback_query(q.id.clone()).await;
 
     // 1. Принятие оферты
     if data == "accept_offer" {
@@ -194,8 +195,11 @@ pub async fn handle_callback(
 
     // Если оферта еще не принята — блокируем любые колбэки кроме оферты
     if !db_user.is_offer_accepted {
-        let _ = bot.answer_callback_query(q.id).text("Сначала необходимо принять условия оферты").await;
-        return Ok(());
+        let allowed = data.starts_with("legal:") || data.starts_with("nav:offer") || data.starts_with("nav:legal") || data == "nav:main_menu";
+        if !allowed {
+            let _ = bot.answer_callback_query(q.id).text("Сначала необходимо принять условия оферты").await;
+            return Ok(());
+        }
     }
 
     let _ = bot.answer_callback_query(q.id).await;
@@ -409,30 +413,70 @@ pub async fn handle_callback(
             card.keywords
         );
 
-        let _ = bot.send_photo(chat_id, InputFile::url(card.image_url.parse().unwrap()))
-            .caption(caption)
-            .parse_mode(ParseMode::Html)
-            .reply_markup(main_menu_keyboard())
-            .await;
+        if let Ok(url) = card.image_url.parse() {
+            let res = bot.send_photo(chat_id, teloxide::types::InputFile::url(url))
+                .caption(caption.clone())
+                .parse_mode(ParseMode::Html)
+                .reply_markup(main_menu_keyboard())
+                .await;
+            if res.is_err() {
+                let _ = bot.send_message(chat_id, caption)
+                    .parse_mode(ParseMode::Html)
+                    .reply_markup(main_menu_keyboard())
+                    .await;
+            }
+        } else {
+            let _ = bot.send_message(chat_id, caption)
+                .parse_mode(ParseMode::Html)
+                .reply_markup(main_menu_keyboard())
+                .await;
+        }
         return Ok(());
     }
 
     if data == "nav:main_menu" {
+        
+        if !db_user.is_offer_accepted {
+            let bot_name = format!("@{}", config.user_bot_name);
+            let raw_text = DETAILED_OFFER_TEXT.replace("@Oraculum_true_bot", &bot_name);
+            let offer_intro = format!(
+                "✨ <b>Добро пожаловать в Сакральный Храм Оракула</b>, {}!\n\n{}",
+                db_user.first_name, raw_text
+            );
+            let _ = bot.send_message(chat_id, offer_intro)
+                .parse_mode(ParseMode::Html)
+                .reply_markup(offer_keyboard())
+                .await;
+            return Ok(());
+        }
+
         let text = format!(
             "🏛 <b>Главный зал Оракула</b>\n\n\
             Ваш запас энергии: ⚡ <b>{}</b>\n\
             Выберите желаемое таинство:",
             db_user.energy_balance
         );
-        let _ = bot.edit_message_text(chat_id, message_id, text)
+        
+        // Попытка отредактировать сообщение (если это текст) или отправить новое
+        let edit_result = bot.edit_message_text(chat_id, message_id, text.clone())
             .parse_mode(ParseMode::Html)
             .reply_markup(main_menu_keyboard())
             .await;
+            
+        if edit_result.is_err() {
+            let _ = bot.send_message(chat_id, text)
+                .parse_mode(ParseMode::Html)
+                .reply_markup(main_menu_keyboard())
+                .await;
+        }
+
         return Ok(());
     }
 
     if data == "nav:offer" {
-        let _ = bot.edit_message_text(chat_id, message_id, DETAILED_OFFER_TEXT)
+        let bot_name = format!("@{}", config.user_bot_name);
+        let text = DETAILED_OFFER_TEXT.replace("@Oraculum_true_bot", &bot_name);
+        let _ = bot.send_message(chat_id, text)
             .parse_mode(ParseMode::Html)
             .reply_markup(legal_menu_keyboard())
             .await;

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔮 Архитектура бота «Oraculum» — Карта проекта</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #0f0f1a;
+            color: #e0e0e0;
+            padding: 40px 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 {
+            text-align: center;
+            font-size: 2.2rem;
+            background: linear-gradient(135deg, #a855f7, #6366f1, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            font-size: 1rem;
+            margin-bottom: 48px;
+        }
+        .diagram-section {
+            background: #1a1a2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 40px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .diagram-section h2 {
+            font-size: 1.4rem;
+            color: #a78bfa;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .diagram-section .desc {
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #2a2a4a;
+            padding-bottom: 16px;
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+            padding: 16px 0;
+        }
+        .mermaid svg { max-width: 100%; height: auto; }
+        .tech-badge {
+            display: inline-block;
+            background: #2a2a4a;
+            color: #a78bfa;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            margin: 2px;
+        }
+        .badges { text-align: center; margin-bottom: 32px; }
+        footer {
+            text-align: center;
+            color: #555;
+            margin-top: 48px;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔮 Архитектурная карта бота «Oraculum»</h1>
+        <p class="subtitle">Telegram Bot — «Архитектор Реальности» · Rust + Teloxide + SQLite + AI LLM</p>
+
+        <div class="badges">
+            <span class="tech-badge">Rust 2021</span>
+            <span class="tech-badge">Teloxide 0.13</span>
+            <span class="tech-badge">Tokio (async)</span>
+            <span class="tech-badge">SQLx / SQLite</span>
+            <span class="tech-badge">Reqwest</span>
+            <span class="tech-badge">OpenAI / DeepSeek API</span>
+            <span class="tech-badge">Tracing</span>
+        </div>
+
+        <!-- ═══════════════ ДИАГРАММА 1 ═══════════════ -->
+        <div class="diagram-section">
+            <h2>📐 1. Общая архитектура системы</h2>
+            <p class="desc">Все компоненты, слои и внешние зависимости бота</p>
+            <div class="mermaid">
+flowchart TD
+    subgraph Clients["👤 Клиенты"]
+        U["Пользователь\n(Telegram)"]
+        A["Админ\n(@Studia_taro)"]
+    end
+
+    subgraph TG_Cloud["☁️ Telegram"]
+        TG["Telegram Bot API\n(Long Polling)"]
+    end
+
+    subgraph Core["🦀 Ядро бота — Rust / Tokio"]
+        direction TB
+
+        subgraph Router["Маршрутизатор (dptree Dispatcher)"]
+            WL{"Whitelist\nПроверка"}
+            MsgH["📩 Message\nHandler"]
+            CbH["🔘 Callback\nHandler"]
+            AdmH["👑 Admin\nHandler"]
+        end
+
+        subgraph Domain["🔮 Эзотерический движок"]
+            Tarot["🃏 Таро\n78 карт + расклады"]
+            Leela["🎲 Лила\n72 клетки бытия"]
+            Astro["🌌 Астрология\n12 знаков Зодиака"]
+        end
+
+        subgraph AI["🧠 ИИ-сервис"]
+            Prompts["Генератор\nпромптов"]
+            AIC["HTTP-клиент\n(reqwest)"]
+        end
+
+        subgraph UI["⌨️ Клавиатуры"]
+            KBMain["Главное меню"]
+            KBCards["Стол карт"]
+            KBSph["Сферы + подвопросы"]
+            KBTar["Тарифы"]
+        end
+
+        subgraph DB["🗄️ База данных"]
+            Pool[("SQLite\nbot.db")]
+            TUsers["users"]
+            THist["readings_history"]
+        end
+    end
+
+    subgraph Ext["🌐 Внешние сервисы"]
+        LLM["🧠 AI API\nOpenAI / DeepSeek"]
+        Pay["💳 ЮKassa\nЮMoney"]
+    end
+
+    U -->|Команды & кнопки| TG
+    A -->|/admin| TG
+    TG <-->|Updates| WL
+    WL -->|✅| MsgH
+    WL -->|✅| CbH
+    WL -->|👑| AdmH
+    WL -->|❌| Drop["🚫 Отказ"]
+
+    MsgH -->|/start /menu| KBMain
+    MsgH -->|Текст| Del["🗑 Удалить + подсказка"]
+
+    CbH --> Domain
+    CbH --> UI
+    CbH --> TUsers
+
+    Domain --> Prompts
+    Prompts --> AIC
+    AIC <-->|HTTPS| LLM
+
+    CbH --> THist
+    CbH -.->|URL| Pay
+    AdmH --> Pool
+
+    TUsers --- Pool
+    THist --- Pool
+            </div>
+        </div>
+
+        <!-- ═══════════════ ДИАГРАММА 2 ═══════════════ -->
+        <div class="diagram-section">
+            <h2>📂 2. Структура модулей (src/)</h2>
+            <p class="desc">Зависимости между файлами исходного кода</p>
+            <div class="mermaid">
+graph LR
+    subgraph Entry["⚡ Точка входа"]
+        Main["main.rs"]
+    end
+
+    subgraph ConfigMod["⚙️ Конфигурация"]
+        Config["config.rs"]
+        Models["models.rs"]
+        States["states.rs"]
+        Offer["offer.rs"]
+    end
+
+    subgraph Handlers["📩 Обработчики"]
+        H["handlers.rs"]
+        AH["admin_handlers.rs"]
+        KB["keyboards.rs"]
+    end
+
+    subgraph Esoterics["🔮 src/esoterics/"]
+        EMod["mod.rs"]
+        Tarot["tarot.rs"]
+        Leela["leela.rs"]
+        Astro["astrology.rs"]
+    end
+
+    subgraph AIMod["🧠 src/ai/"]
+        AIMo["mod.rs"]
+        AIC["client.rs"]
+        AIP["prompts.rs"]
+    end
+
+    subgraph Storage["🗄️ Хранилище"]
+        DB["db.rs"]
+    end
+
+    Main --> Config
+    Main --> DB
+    Main --> AIC
+    Main --> H
+    Main --> AH
+
+    H --> DB
+    H --> AIC
+    H --> AIP
+    H --> KB
+    H --> Tarot
+    H --> Leela
+    H --> Astro
+    H --> Offer
+
+    AH --> DB
+    AH --> Config
+
+    KB --> Tarot
+    KB --> Astro
+
+    AIC --> AIP
+
+    DB --> Models
+            </div>
+        </div>
+
+        <!-- ═══════════════ ДИАГРАММА 3 ═══════════════ -->
+        <div class="diagram-section">
+            <h2>🔄 3. Сценарий расклада Таро (Sequence)</h2>
+            <p class="desc">Полный поток от клика пользователя до получения ИИ-толкования</p>
+            <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor User as 👤 Пользователь
+    participant Bot as 🤖 Бот
+    participant DB as 🗄️ SQLite
+    participant Engine as 🃏 TarotDeck
+    participant AI as 🧠 AI LLM
+
+    User->>Bot: Кнопка "🔮 Сделать расклад"
+    Bot->>DB: Проверка оферты + баланс энергии
+    alt Оферта не принята
+        Bot-->>User: Экран оферты
+    else Нет энергии
+        Bot-->>User: Экран тарифов
+    else ОК
+        Bot-->>User: Сферы жизни (Любовь / Карьера / ...)
+        User->>Bot: Выбор сферы
+        Bot-->>User: Подвопросы сферы
+        User->>Bot: Выбор подвопроса
+        Bot-->>User: Тип расклада (1/3/5 карт)
+        User->>Bot: Выбор расклада
+        Bot-->>User: 🃏 Виртуальный стол (6 закрытых карт)
+        loop Выбор карт
+            User->>Bot: Клик на карту
+            Bot-->>User: ✨ Карта открыта
+        end
+        Bot->>Engine: draw_cards(N)
+        Bot-->>User: ⏳ "Оракул входит в транс..."
+        Bot->>AI: POST /chat/completions (промпт + карты)
+        AI-->>Bot: Толкование Оракула
+        Bot->>DB: Списание энергии + сохранение
+        Bot-->>User: 🔮 Карты + Толкование + кнопка "В меню"
+    end
+            </div>
+        </div>
+
+        <!-- ═══════════════ ДИАГРАММА 4 ═══════════════ -->
+        <div class="diagram-section">
+            <h2>🗺️ 4. Навигация пользователя (State Flow)</h2>
+            <p class="desc">Все экраны и переходы по Inline-кнопкам меню</p>
+            <div class="mermaid">
+stateDiagram-v2
+    [*] --> Whitelist_Check
+
+    state Whitelist_Check {
+        [*] --> Gate
+        Gate --> Blocked : ❌ Не в списке
+        Gate --> Offer_Check : ✅ Разрешён
+    }
+
+    state Offer_Check {
+        [*] --> Is_Accepted
+        Is_Accepted --> Offer_Screen : Нет
+        Is_Accepted --> Main_Menu : Да
+        Offer_Screen --> Main_Menu : Принял оферту
+    }
+
+    state Main_Menu {
+        [*] --> Hub
+        Hub --> Tarot : 🔮 Расклад Таро
+        Hub --> Card_Of_Day : 🌙 Карта Дня
+        Hub --> Astrology : 🌌 Астрология
+        Hub --> Leela : 🎲 Игра Лила
+        Hub --> Profile : 👤 Профиль
+        Hub --> Settings : ⚙️ Настройки
+        Hub --> Tariffs : 💎 Тарифы
+        Hub --> Support : 🛟 Поддержка
+    }
+
+    state Tarot {
+        Sphere --> Subtopic
+        Subtopic --> Spread_Type
+        Spread_Type --> Card_Pick
+        Card_Pick --> AI_Reading
+    }
+
+    state Astrology {
+        Zodiac_Sign --> Astro_Reading
+    }
+
+    state Leela {
+        Dice_Roll --> Cell_Result
+        Cell_Result --> Leela_AI
+    }
+
+    AI_Reading --> Main_Menu
+    Astro_Reading --> Main_Menu
+    Leela_AI --> Main_Menu
+    Tariffs --> Main_Menu
+    Settings --> Main_Menu
+    Profile --> Main_Menu
+    Support --> Main_Menu
+    Card_Of_Day --> Main_Menu
+            </div>
+        </div>
+
+        <!-- ═══════════════ ДИАГРАММА 5 ═══════════════ -->
+        <div class="diagram-section">
+            <h2>🗃️ 5. Схема базы данных (ERD)</h2>
+            <p class="desc">Таблицы SQLite и связи между ними</p>
+            <div class="mermaid">
+erDiagram
+    USERS ||--o{ SPREAD_HISTORY : "делает расклады"
+    USERS ||--o{ TRANSACTIONS : "совершает оплату"
+    TARIFFS ||--o{ TRANSACTIONS : "тариф -> покупка"
+
+    USERS {
+        int telegram_id PK
+        text username
+        text first_name
+        text last_name
+        int energy_balance
+        bool is_offer_accepted
+        bool is_ai_enhanced
+        bool notifications_enabled
+        text subscription_tier
+        datetime created_at
+    }
+
+    SPREAD_HISTORY {
+        int id PK
+        int user_id FK
+        text spread_type
+        text sphere
+        text question
+        text cards_json
+        text ai_response
+        datetime created_at
+    }
+
+    TRANSACTIONS {
+        int id PK
+        int user_id FK
+        int tariff_id FK
+        real amount_rub
+        text status
+        datetime created_at
+    }
+
+    TARIFFS {
+        int id PK
+        text code
+        text title
+        real price_rub
+        int spreads_count
+        int duration_days
+    }
+            </div>
+        </div>
+
+        <footer>
+            Сгенерировано автоматически · Архитектурная карта проекта «Oraculum» · Mermaid.js
+        </footer>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#6366f1',
+                primaryTextColor: '#e0e0e0',
+                primaryBorderColor: '#4f46e5',
+                lineColor: '#818cf8',
+                secondaryColor: '#1e1b4b',
+                tertiaryColor: '#1a1a2e',
+                background: '#1a1a2e',
+                mainBkg: '#2a2a4a',
+                nodeBorder: '#4f46e5',
+                clusterBkg: '#16162a',
+                clusterBorder: '#3730a3',
+                titleColor: '#a78bfa',
+                edgeLabelBackground: '#1a1a2e',
+                fontSize: '14px'
+            },
+            flowchart: { curve: 'basis', padding: 20 },
+            sequence: { mirrorActors: false },
+        });
+    </script>
+</body>
+</html>

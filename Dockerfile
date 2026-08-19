@@ -1,23 +1,29 @@
-FROM rust:1.80-slim-bullseye AS builder
+# ====================================================================
+# Dockerfile: Fast deployment using pre-built binary
+# ====================================================================
+FROM debian:bookworm-slim
+
+# Установка необходимых системных библиотек (SSL, SQLite, CA сертификаты)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libssl3 \
+    sqlite3 \
+    tzdata \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 
-COPY Cargo.toml Cargo.lock ./
-# Кэширование зависимостей
-RUN mkdir src && echo "fn main() {}" > src/main.rs && cargo build --release && rm -rf src
+# Копируем скомпилированный release бинарник
+COPY telegram_bot /app/telegram_bot
+RUN chmod +x /app/telegram_bot
 
-COPY . .
-RUN touch src/main.rs && cargo build --release
-
-FROM debian:bullseye-slim
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y ca-certificates libssl1.1 sqlite3 && rm -rf /var/lib/apt/lists/*
-
-COPY --from=builder /app/target/release/telegram_bot /app/telegram_bot
-
+# Папка для постоянных данных (SQLite БД и логи)
+RUN mkdir -p /app/data
 VOLUME ["/app/data"]
+
+# Переменная окружения для базы данных по умолчанию
 ENV DATABASE_URL="sqlite:///app/data/bot.db?mode=rwc"
+ENV RUST_LOG="info"
 
 CMD ["/app/telegram_bot"]

@@ -13,6 +13,9 @@ mod models;
 mod offer;
 mod states;
 
+#[cfg(test)]
+mod tests;
+
 use admin_handlers::{handle_admin_callback, handle_admin_message};
 use ai::AiClient;
 use config::Config;

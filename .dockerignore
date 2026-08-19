@@ -1,0 +1,5 @@
+.git/
+.env
+bot.db
+*.html
+*.log

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Карта Интерфейса Telegram Бота Godania",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "start", "type": "backend", "label": "Команда /start" },
+    { "id": "offer", "type": "security", "label": "Оферта (offer_keyboard)" },
+    { "id": "menu", "type": "frontend", "label": "Главное меню (main_menu)" },
+
+    { "id": "tarot", "type": "frontend", "label": "Модуль Таро" },
+    { "id": "t_spheres", "type": "frontend", "label": "Сферы Таро" },
+    { "id": "t_sub", "type": "frontend", "label": "Подтемы" },
+    { "id": "t_spreads", "type": "frontend", "label": "Расклады" },
+    { "id": "t_cards", "type": "frontend", "label": "Выбор карт" },
+    { "id": "t_res", "type": "database", "label": "Связь с Тарологом" },
+
+    { "id": "astro", "type": "frontend", "label": "Астрология и Лила" },
+    { "id": "a_signs", "type": "frontend", "label": "Знаки Зодиака" },
+    { "id": "a_res", "type": "database", "label": "ИИ Гороскоп" },
+    { "id": "leela", "type": "frontend", "label": "Игра Лила" },
+
+    { "id": "other", "type": "frontend", "label": "Настройки и Инфо" },
+    { "id": "set", "type": "frontend", "label": "Настройки" },
+    { "id": "tar", "type": "frontend", "label": "Тарифы" },
+    { "id": "sup", "type": "frontend", "label": "Поддержка" }
+  ],
+  "edges": [
+    { "from": "start", "to": "offer", "role": "main" },
+    { "from": "offer", "to": "menu", "role": "main" },
+
+    { "from": "menu", "to": "tarot", "role": "branch", "label": "Таро" },
+    { "from": "tarot", "to": "t_spheres", "role": "main" },
+    { "from": "t_spheres", "to": "t_sub", "role": "main" },
+    { "from": "t_sub", "to": "t_spreads", "role": "main" },
+    { "from": "t_spreads", "to": "t_cards", "role": "main" },
+    { "from": "t_cards", "to": "t_res", "role": "async" },
+
+    { "from": "menu", "to": "astro", "role": "branch", "label": "Гороскоп/Лила" },
+    { "from": "astro", "to": "a_signs", "role": "main" },
+    { "from": "a_signs", "to": "a_res", "role": "main" },
+    { "from": "astro", "to": "leela", "role": "branch" },
+
+    { "from": "menu", "to": "other", "role": "branch", "label": "Настройки" },
+    { "from": "other", "to": "set", "role": "main" },
+    { "from": "other", "to": "tar", "role": "branch" },
+    { "from": "other", "to": "sup", "role": "branch" }
+  ]
+}
