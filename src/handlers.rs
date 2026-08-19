@@ -61,7 +61,7 @@ pub async fn handle_message(
 
     let text = msg.text().unwrap_or("");
 
-    // Если оферта еще не принята — всегда показываем экран оферты
+    // Если оферта еще не принята — показываем аккуратное единое сообщение
     if !db_user.is_offer_accepted {
         let bot_name = format!("@{}", config.user_bot_name);
         let raw_text = DETAILED_OFFER_TEXT.replace("@Oraculum_true_bot", &bot_name);
@@ -72,7 +72,7 @@ pub async fn handle_message(
 
         let _ = bot.send_message(msg.chat.id, offer_intro)
             .parse_mode(ParseMode::Html)
-            .reply_markup(offer_keyboard())
+            .reply_markup(crate::offer::legal_menu_keyboard(true))
             .await;
         return Ok(());
     }
@@ -181,10 +181,16 @@ pub async fn handle_callback(
         let _ = db.accept_offer(user_id).await;
         let _ = bot.answer_callback_query(q.id).text("✅ Оферта успешно принята!").await;
         
+        let (_, remaining) = match db.can_make_free_reading(user_id, config.max_free_lifetime_readings).await {
+            Ok(res) => res,
+            Err(_) => (true, 10),
+        };
+
         let text = format!(
             "✨ <b>Врата Оракула открыты для вас, {}!</b>\n\n\
+            🎁 Доступно бесплатных раскладов: <b>{}</b>\n\n\
             Выберите таинство, к которому желает обратиться ваша душа:",
-            db_user.first_name
+            db_user.first_name, remaining
         );
         let _ = bot.edit_message_text(chat_id, message_id, text)
             .parse_mode(ParseMode::Html)
@@ -230,7 +236,7 @@ pub async fn handle_callback(
             Выберите интересующий вас документ для ознакомления:";
         let _ = bot.edit_message_text(chat_id, message_id, text)
             .parse_mode(ParseMode::Html)
-            .reply_markup(crate::offer::legal_menu_keyboard())
+            .reply_markup(crate::offer::legal_menu_keyboard(!db_user.is_offer_accepted))
             .await;
         return Ok(());
     }
@@ -262,7 +268,7 @@ pub async fn handle_callback(
     if data == "legal:privacy" {
         let _ = bot.edit_message_text(chat_id, message_id, crate::offer::PRIVACY_POLICY_TEXT)
             .parse_mode(ParseMode::Html)
-            .reply_markup(crate::offer::legal_menu_keyboard())
+            .reply_markup(crate::offer::legal_menu_keyboard(!db_user.is_offer_accepted))
             .await;
         return Ok(());
     }
@@ -270,7 +276,7 @@ pub async fn handle_callback(
     if data == "legal:consent" {
         let _ = bot.edit_message_text(chat_id, message_id, crate::offer::CONSENT_TEXT)
             .parse_mode(ParseMode::Html)
-            .reply_markup(crate::offer::legal_menu_keyboard())
+            .reply_markup(crate::offer::legal_menu_keyboard(!db_user.is_offer_accepted))
             .await;
         return Ok(());
     }
@@ -476,9 +482,9 @@ pub async fn handle_callback(
     if data == "nav:offer" {
         let bot_name = format!("@{}", config.user_bot_name);
         let text = DETAILED_OFFER_TEXT.replace("@Oraculum_true_bot", &bot_name);
-        let _ = bot.send_message(chat_id, text)
+        let _ = bot.edit_message_text(chat_id, message_id, text)
             .parse_mode(ParseMode::Html)
-            .reply_markup(legal_menu_keyboard())
+            .reply_markup(legal_menu_keyboard(!db_user.is_offer_accepted))
             .await;
         return Ok(());
     }

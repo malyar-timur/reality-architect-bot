@@ -193,7 +193,8 @@ pub fn contact_tarologist_keyboard(payment_url: Option<&str>) -> InlineKeyboardM
         ]);
     }
     rows.push(vec![
-        InlineKeyboardButton::callback("← Главное меню", "nav:main_menu"),
+        InlineKeyboardButton::callback("🔮 Сделать ещё расклад", "nav:tarot_spheres"),
+        InlineKeyboardButton::callback("🏠 Главное меню", "nav:main_menu"),
     ]);
     InlineKeyboardMarkup::new(rows)
 }

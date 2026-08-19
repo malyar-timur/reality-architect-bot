@@ -166,8 +166,8 @@ pub fn offer_keyboard() -> InlineKeyboardMarkup {
     ])
 }
 
-pub fn legal_menu_keyboard() -> InlineKeyboardMarkup {
-    InlineKeyboardMarkup::new(vec![
+pub fn legal_menu_keyboard(needs_accept: bool) -> InlineKeyboardMarkup {
+    let mut rows = vec![
         vec![
             InlineKeyboardButton::callback("📜 Публичная оферта", "legal:offer"),
         ],
@@ -177,10 +177,19 @@ pub fn legal_menu_keyboard() -> InlineKeyboardMarkup {
         vec![
             InlineKeyboardButton::callback("📝 Согласие на обработку данных", "legal:consent"),
         ],
-        vec![
+    ];
+
+    if needs_accept {
+        rows.push(vec![
+            InlineKeyboardButton::callback("✅ Я принимаю условия оферты", "accept_offer"),
+        ]);
+    } else {
+        rows.push(vec![
             InlineKeyboardButton::callback("← Главное меню", "nav:main_menu"),
-        ],
-    ])
+        ]);
+    }
+
+    InlineKeyboardMarkup::new(rows)
 }
 
 
