@@ -75,11 +75,12 @@ async fn main() -> anyhow::Result<()> {
     info!("1. Бот пользователей: @arch_reality_2026_bot");
     info!("2. Бот настроек/админки: @arch_settings_bot");
 
-    // 6. Одновременный запуск двух ботов через tokio::join
-    tokio::select! {
-        _ = user_dispatcher.dispatch() => info!("User bot stopped"),
-        _ = admin_dispatcher.dispatch() => info!("Admin bot stopped"),
-    }
+    // 6. Одновременный запуск двух ботов через tokio::try_join!
+    let (res_user, res_admin) = tokio::join!(
+        user_dispatcher.dispatch(),
+        admin_dispatcher.dispatch(),
+    );
+    info!("Bots dispatch finished: user={:?}, admin={:?}", res_user, res_admin);
 
     info!("Bots shutdown complete.");
     Ok(())

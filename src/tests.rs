@@ -46,6 +46,7 @@ mod tests {
         config.admin_usernames = vec!["mixanik2000".to_string(), "Studia_taro".to_string()];
         
         assert!(config.is_admin(Some("mixanik2000")), "mixanik2000 должен иметь доступ к админке");
+        assert!(config.is_admin(Some("@mixanik2000")), "@mixanik2000 с собачкой должен иметь доступ к админке");
         assert!(config.is_admin(Some("Studia_taro")), "Studia_taro должна иметь доступ к админке");
         assert!(!config.is_admin(Some("hacker_1337")), "Посторонний не должен иметь доступ к админке");
     }

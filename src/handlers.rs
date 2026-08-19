@@ -33,9 +33,10 @@ pub async fn handle_message(
     let first_name = user.first_name.clone();
     let last_name = user.last_name.clone();
 
-    // 🔒 БЕЛЫЙ СПИСОК (Whitelist): доступ разрешен только указанному пользователю (по умолчанию @Studia_taro)
+    // 🔒 БЕЛЫЙ СПИСОК (Whitelist): доступ разрешен указанному пользователю или админам
     if let Some(ref allowed) = config.allowed_username {
-        let is_allowed = username.as_ref().map(|u| u.eq_ignore_ascii_case(allowed)).unwrap_or(false);
+        let is_allowed = username.as_ref().map(|u| u.eq_ignore_ascii_case(allowed)).unwrap_or(false)
+            || config.is_admin(username.as_deref());
         if !is_allowed {
             let access_denied_text = format!(
                 "🔒 <b>Доступ ограничен</b>\n\n\
@@ -476,6 +477,27 @@ pub async fn handle_callback(
                 .await;
         }
 
+        return Ok(());
+    }
+
+    if data == "nav:restart" {
+        // Сброс и перезапуск интерфейса в главное меню
+        let (_can_read, remaining) = match db.can_make_free_reading(user_id, config.max_free_lifetime_readings).await {
+            Ok(res) => res,
+            Err(_) => (true, 10),
+        };
+        let first_name = q.from.first_name.clone();
+        let welcome = format!(
+            "✨ <b>Бот успешно перезапущен!</b>\n\n\
+            Добро пожаловать в «Архитектор реальности», {}!\n\
+            Здесь древние знания Таро и звездные матрицы сплетаются с искусственным интеллектом.\n\n\
+            🎁 Доступно бесплатных раскладов: <b>{} из {}</b>",
+            first_name, remaining, config.max_free_lifetime_readings
+        );
+        let _ = bot.edit_message_text(chat_id, message_id, welcome)
+            .parse_mode(ParseMode::Html)
+            .reply_markup(main_menu_keyboard())
+            .await;
         return Ok(());
     }
 
