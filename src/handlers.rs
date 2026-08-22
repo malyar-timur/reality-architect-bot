@@ -104,7 +104,21 @@ pub async fn handle_message(
     }
 
     if text == "/start" || text == "/menu" {
-        send_main_menu(&bot, msg.chat.id, &db_user.first_name, db_user.energy_balance).await?;
+        let (_, remaining) = match db.can_make_free_reading(user_id, config.max_free_lifetime_readings).await {
+            Ok(res) => res,
+            Err(_) => (true, 10),
+        };
+        let menu_text = format!(
+            "✨ <b>Главное меню ORACULUM</b>\n\n\
+            🔮 Добро пожаловать в пространство сакральных знаний и ИИ-Оракула, {}!\n\n\
+            🎁 Доступно бесплатных раскладов: <b>{} из 10</b>\n\n\
+            Выберите интересующий вас раздел:",
+            db_user.first_name, remaining
+        );
+        let _ = bot.send_message(msg.chat.id, menu_text)
+            .parse_mode(ParseMode::Html)
+            .reply_markup(main_menu_keyboard())
+            .await;
         return Ok(());
     }
 
@@ -864,6 +878,7 @@ pub async fn handle_callback(
     Ok(())
 }
 
+#[allow(dead_code)]
 async fn send_main_menu(bot: &Bot, chat_id: ChatId, first_name: &str, energy: i64) -> ResponseResult<()> {
     let text = format!(
         "🏛 <b>Храм Оракула приветствует вас, {}!</b>\n\n\
