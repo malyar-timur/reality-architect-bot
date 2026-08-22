@@ -8,9 +8,10 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=sqlite:///app/data/bot.db?mode=rwc
     volumes:
       - ./data:/app/data
-      - ./bot.db:/app/bot.db
     logging:
       driver: "json-file"
       options:
