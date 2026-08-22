@@ -33,11 +33,10 @@ pub fn main_menu_keyboard() -> InlineKeyboardMarkup {
         ],
         vec![
             InlineKeyboardButton::callback("👤 Профиль", "nav:profile"),
-            InlineKeyboardButton::callback("⚙️ Настройки", "nav:settings"),
+            InlineKeyboardButton::callback("🛟 Поддержка", "nav:support"),
         ],
         vec![
             InlineKeyboardButton::callback("🔄 Перезапустить бота", "nav:restart"),
-            InlineKeyboardButton::callback("🛟 Поддержка", "nav:support"),
         ],
     ])
 }
