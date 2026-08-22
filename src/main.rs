@@ -21,6 +21,7 @@ use ai::AiClient;
 use config::Config;
 use db::Db;
 use handlers::{handle_callback, handle_message};
+use teloxide::types::BotCommand;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -50,6 +51,16 @@ async fn main() -> anyhow::Result<()> {
 
     // 4. Инициализация 1-го бота: БОТ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ (@arch_reality_2026_bot)
     let user_bot = Bot::new(&config.teloxide_token);
+
+    // Регистрируем кнопку «Меню» в интерфейсе Telegram
+    let user_commands = vec![
+        BotCommand::new("start", "🔮 Запустить бота и открыть Святилище Оракула"),
+        BotCommand::new("menu", "🏠 Главное меню и расклады"),
+        BotCommand::new("restart", "🔄 Перезапустить диалог"),
+        BotCommand::new("help", "🛟 Помощь и поддержка"),
+    ];
+    let _ = user_bot.set_my_commands(user_commands).await;
+
     let user_handler = dptree::entry()
         .branch(Update::filter_message().endpoint(handle_message))
         .branch(Update::filter_callback_query().endpoint(handle_callback));
@@ -62,6 +73,14 @@ async fn main() -> anyhow::Result<()> {
     // 5. Инициализация 2-го бота: БОТ ДЛЯ НАСТРОЕК И АДМИНКИ (@arch_settings_bot)
     let admin_bot_token = std::env::var("ADMIN_BOT_TOKEN").unwrap_or_else(|_| config.teloxide_token.clone());
     let admin_bot = Bot::new(&admin_bot_token);
+
+    let admin_commands = vec![
+        BotCommand::new("admin", "⚙️ Открыть Панель Управления Оракулом"),
+        BotCommand::new("stats", "📊 Статистика пользователей и баланса"),
+        BotCommand::new("start", "🚀 Запуск панели настроек"),
+    ];
+    let _ = admin_bot.set_my_commands(admin_commands).await;
+
     let admin_handler = dptree::entry()
         .branch(Update::filter_message().endpoint(handle_admin_message))
         .branch(Update::filter_callback_query().endpoint(handle_admin_callback));
