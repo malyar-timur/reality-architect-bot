@@ -103,7 +103,10 @@ pub async fn handle_message(
         }
     }
 
-    if text == "/start" || text == "/menu" {
+    if text == "/start" || text == "/menu" || text == "/restart" || text == "/reset" {
+        // Удаляем команду пользователя /start, чтобы чат оставался идеально чистым
+        let _ = bot.delete_message(msg.chat.id, msg.id).await;
+
         let (_, remaining) = match db.can_make_free_reading(user_id, config.max_free_lifetime_readings).await {
             Ok(res) => res,
             Err(_) => (true, 10),
@@ -225,7 +228,7 @@ pub async fn handle_callback(
 
     let _ = bot.answer_callback_query(q.id).await;
 
-    if data == "nav:main" {
+    if data == "nav:main" || data == "nav:main_menu" || data == "nav:restart" {
         let (_can_read, remaining) = match db.can_make_free_reading(user_id, config.max_free_lifetime_readings).await {
             Ok(res) => res,
             Err(_) => (true, 10),
