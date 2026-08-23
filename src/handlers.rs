@@ -107,16 +107,37 @@ pub async fn handle_message(
         // Удаляем команду пользователя /start, чтобы чат оставался идеально чистым
         let _ = bot.delete_message(msg.chat.id, msg.id).await;
 
-        let (_, remaining) = match db.can_make_free_reading(user_id, config.max_free_lifetime_readings).await {
-            Ok(res) => res,
-            Err(_) => (true, 10),
+        let status = db.check_access(user_id, config.daily_free_readings).await.unwrap_or(crate::models::UserAccessStatus {
+            can_access: true,
+            access_type: crate::models::AccessType::DailyFree,
+            is_premium: false,
+            premium_until: None,
+            daily_used_today: 0,
+            daily_limit: config.daily_free_readings,
+            energy_balance: db_user.energy_balance,
+        });
+
+        let balance_status = if status.is_premium {
+            let until = status.premium_until.as_deref().unwrap_or("активен");
+            format!("⭐ <b>Статус</b>: ПРЕМИУМ ПОДПИСКА ♾ (до {})\n🔮 <b>Расклады</b>: Безлимитно", until)
+        } else {
+            let free_status = if status.daily_used_today < status.daily_limit {
+                "✅ <b>Доступен (1 из 1)</b>"
+            } else {
+                "❌ <b>Использован на сегодня (0 из 1)</b>"
+            };
+            format!(
+                "🎁 <b>Бесплатный расклад на сегодня</b>: {}\n⚡ <b>Дополнительные расклады</b>: <b>{}</b>\n⏳ <i>Бесплатный расклад обновляется каждые сутки в 00:00 UTC (не копится).</i>",
+                free_status, status.energy_balance
+            )
         };
+
         let menu_text = format!(
             "✨ <b>Главное меню ORACULUM</b>\n\n\
             🔮 Добро пожаловать в пространство сакральных знаний и ИИ-Оракула, {}!\n\n\
-            🎁 Доступно бесплатных раскладов: <b>{} из 10</b>\n\n\
+            {}\n\n\
             Выберите интересующий вас раздел:",
-            db_user.first_name, remaining
+            db_user.first_name, balance_status
         );
         let _ = bot.send_message(msg.chat.id, menu_text)
             .parse_mode(ParseMode::Html)
@@ -199,16 +220,22 @@ pub async fn handle_callback(
         let _ = db.accept_offer(user_id).await;
         let _ = bot.answer_callback_query(q.id).text("✅ Оферта успешно принята!").await;
         
-        let (_, remaining) = match db.can_make_free_reading(user_id, config.max_free_lifetime_readings).await {
-            Ok(res) => res,
-            Err(_) => (true, 10),
-        };
+        let status = db.check_access(user_id, config.daily_free_readings).await.unwrap_or(crate::models::UserAccessStatus {
+            can_access: true,
+            access_type: crate::models::AccessType::DailyFree,
+            is_premium: false,
+            premium_until: None,
+            daily_used_today: 0,
+            daily_limit: config.daily_free_readings,
+            energy_balance: db_user.energy_balance,
+        });
 
         let text = format!(
             "✨ <b>Врата Оракула открыты для вас, {}!</b>\n\n\
-            🎁 Доступно бесплатных раскладов: <b>{}</b>\n\n\
+            🎁 Вам доступен <b>1 бесплатный запрос</b> к ИИ каждый день.\n\
+            ⚡ Дополнительный баланс: <b>{}</b>\n\n\
             Выберите таинство, к которому желает обратиться ваша душа:",
-            db_user.first_name, remaining
+            db_user.first_name, status.energy_balance
         );
         let _ = bot.edit_message_text(chat_id, message_id, text)
             .parse_mode(ParseMode::Html)
@@ -229,16 +256,37 @@ pub async fn handle_callback(
     let _ = bot.answer_callback_query(q.id).await;
 
     if data == "nav:main" || data == "nav:main_menu" || data == "nav:restart" {
-        let (_can_read, remaining) = match db.can_make_free_reading(user_id, config.max_free_lifetime_readings).await {
-            Ok(res) => res,
-            Err(_) => (true, 10),
+        let status = db.check_access(user_id, config.daily_free_readings).await.unwrap_or(crate::models::UserAccessStatus {
+            can_access: true,
+            access_type: crate::models::AccessType::DailyFree,
+            is_premium: false,
+            premium_until: None,
+            daily_used_today: 0,
+            daily_limit: config.daily_free_readings,
+            energy_balance: db_user.energy_balance,
+        });
+
+        let balance_status = if status.is_premium {
+            let until = status.premium_until.as_deref().unwrap_or("активен");
+            format!("⭐ <b>Статус</b>: ПРЕМИУМ ПОДПИСКА ♾ (до {})\n🔮 <b>Расклады</b>: Безлимитно", until)
+        } else {
+            let free_status = if status.daily_used_today < status.daily_limit {
+                "✅ <b>Доступен (1 из 1)</b>"
+            } else {
+                "❌ <b>Использован на сегодня (0 из 1)</b>"
+            };
+            format!(
+                "🎁 <b>Бесплатный расклад на сегодня</b>: {}\n⚡ <b>Дополнительные расклады</b>: <b>{}</b>\n⏳ <i>Бесплатный расклад обновляется каждые сутки в 00:00 UTC (не копится).</i>",
+                free_status, status.energy_balance
+            )
         };
+
         let text = format!(
             "✨ <b>Главное меню ORACULUM</b>\n\n\
             🔮 Добро пожаловать в пространство сакральных знаний и ИИ-Оракула.\n\n\
-            🎁 Доступно бесплатных раскладов: <b>{} из 10</b>\n\n\
+            {}\n\n\
             Выберите интересующий вас раздел:",
-            remaining
+            balance_status
         );
         let _ = bot.edit_message_text(chat_id, message_id, text)
             .parse_mode(ParseMode::Html)
@@ -403,6 +451,32 @@ pub async fn handle_callback(
     }
 
     if data == "nav:card_of_the_day" {
+        // Проверка лимитов для Карты Дня (так как это тоже запрос к ИИ)
+        let access_check = db.check_access(user_id, config.daily_free_readings).await.unwrap_or(crate::models::UserAccessStatus {
+            can_access: false,
+            access_type: crate::models::AccessType::DailyFree,
+            is_premium: false,
+            premium_until: None,
+            daily_used_today: 1,
+            daily_limit: config.daily_free_readings,
+            energy_balance: db_user.energy_balance,
+        });
+
+        if !access_check.can_access {
+            let limit_text = "🔒 <b>Лимит бесплатных запросов исчерпан</b>\n\n\
+                Вы уже использовали ваш <b>1 бесплатный запрос к ИИ</b> на сегодня.\n\n\
+                ⏳ <i>Следующий бесплатный запрос откроется завтра в 00:00 UTC (запросы не копятся).</i>\n\n\
+                💎 Чтобы продолжить без ограничений, выберите <b>Тариф</b> (пакет раскладов или Премиум-подписку):";
+            let _ = bot.edit_message_text(chat_id, message_id, limit_text)
+                .parse_mode(ParseMode::Html)
+                .reply_markup(tariffs_keyboard())
+                .await;
+            return Ok(());
+        }
+
+        // Списываем право на запрос
+        let _ = db.consume_reading_charge(user_id, config.daily_free_readings).await;
+
         // Быстрый запуск расклада Карта Дня - Оракул открывает Аркан вашего сегодняшнего дня
         let drawn = TarotDeck::draw_cards(1);
         let (card, is_reversed) = &drawn[0];
@@ -421,6 +495,16 @@ pub async fn handle_callback(
             Ok(res) => res,
             Err(_) => format!("Аркан: {}{}\n\nСвет знания: Доверьтесь интуиции и наблюдайте за знаками.", card.name, orientation),
         };
+
+        // Сохраняем в историю
+        let _ = db.save_reading_history(
+            user_id,
+            "card_of_the_day",
+            "Карта Дня",
+            None,
+            &format!("{}{}", card.name, orientation),
+            &ai_result,
+        ).await;
 
         if let Ok(m) = wait_msg {
             let _ = bot.delete_message(chat_id, m.id).await;
@@ -499,17 +583,46 @@ pub async fn handle_callback(
 
     if data == "nav:restart" {
         // Сброс и перезапуск интерфейса в главное меню
-        let (_can_read, remaining) = match db.can_make_free_reading(user_id, config.max_free_lifetime_readings).await {
-            Ok(res) => res,
-            Err(_) => (true, 10),
+        let access_check = db.check_access(user_id, config.daily_free_readings).await.unwrap_or(crate::models::UserAccessStatus {
+            can_access: true,
+            access_type: crate::models::AccessType::DailyFree,
+            is_premium: false,
+            premium_until: None,
+            daily_used_today: 0,
+            daily_limit: config.daily_free_readings,
+            energy_balance: db_user.energy_balance,
+        });
+
+        let status_str = if access_check.is_premium {
+            let until_str = access_check.premium_until
+                .map(|dt| {
+                    if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(&dt) {
+                        parsed.format("%d.%m.%Y").to_string()
+                    } else {
+                        dt
+                    }
+                })
+                .unwrap_or_else(|| "активна".to_string());
+            format!("⭐ <b>Статус:</b> ПРЕМИУМ (до {})\n🔮 <b>Расклады:</b> ♾ Безлимит", until_str)
+        } else {
+            let daily_status = if access_check.daily_used_today < access_check.daily_limit {
+                "✅ <b>Доступен (1 из 1)</b>"
+            } else {
+                "❌ <b>Использован (0 из 1)</b> <i>(обновится в 00:00 UTC)</i>"
+            };
+            format!(
+                "🔮 <b>Бесплатный запрос сегодня:</b> {}\n⚡ <b>Дополнительные расклады:</b> <b>{}</b>",
+                daily_status, access_check.energy_balance
+            )
         };
+
         let first_name = q.from.first_name.clone();
         let welcome = format!(
             "✨ <b>Бот успешно перезапущен!</b>\n\n\
             Добро пожаловать в «Архитектор реальности», {}!\n\
             Здесь древние знания Таро и звездные матрицы сплетаются с искусственным интеллектом.\n\n\
-            🎁 Доступно бесплатных раскладов: <b>{} из {}</b>",
-            first_name, remaining, config.max_free_lifetime_readings
+            {}",
+            first_name, status_str
         );
         let _ = bot.edit_message_text(chat_id, message_id, welcome)
             .parse_mode(ParseMode::Html)
@@ -530,17 +643,41 @@ pub async fn handle_callback(
 
     if data == "nav:profile" {
         let history = db.get_user_history(user_id, 10).await.unwrap_or_default();
+        let status = db.check_access(user_id, config.daily_free_readings).await.unwrap_or(crate::models::UserAccessStatus {
+            can_access: true,
+            access_type: crate::models::AccessType::DailyFree,
+            is_premium: false,
+            premium_until: None,
+            daily_used_today: 0,
+            daily_limit: config.daily_free_readings,
+            energy_balance: db_user.energy_balance,
+        });
+
+        let status_desc = if status.is_premium {
+            let until = status.premium_until.as_deref().unwrap_or("активен");
+            format!("⭐ <b>ПРЕМИУМ ПОДПИСКА</b>\n📅 <b>Действует до</b>: {}\n🔮 <b>Расклады</b>: ♾ Безлимит", until)
+        } else {
+            let free_state = if status.daily_used_today < status.daily_limit {
+                "✅ 1 из 1 (доступен)"
+            } else {
+                "❌ 0 из 1 (исчерпан на сегодня)"
+            };
+            format!(
+                "👤 <b>Базовый искатель</b>\n🎁 <b>Бесплатный расклад сегодня</b>: {}\n⚡ <b>Дополнительные расклады</b>: {}\n⏳ <i>Бесплатный расклад обновляется каждые 24 часа в 00:00 UTC (не копится).</i>",
+                free_state, status.energy_balance
+            )
+        };
+
         let text = format!(
             "👤 <b>Сакральный Профиль Искателя</b>\n\n\
             🆔 <b>ID</b>: <code>{}</code>\n\
-            ✨ <b>Имя</b>: {}\n\
-            ⚡ <b>Энергия для раскладов</b>: {}\n\
-            🔮 <b>Сохраненных раскладов</b>: {}\n\
-            📅 <b>В Храме с</b>: {}\n\n\
-            <i>Энергия пополняется ежедневно (+1 расклад каждые 24 часа).</i>",
+            ✨ <b>Имя</b>: {}\n\n\
+            {}\n\n\
+            🔮 <b>Сохраненных раскладов в летописи</b>: {}\n\
+            📅 <b>В Храме с</b>: {}",
             db_user.telegram_id,
             db_user.first_name,
-            db_user.energy_balance,
+            status_desc,
             history.len(),
             db_user.created_at
         );
@@ -675,24 +812,30 @@ pub async fn handle_callback(
                 return Ok(());
             }
 
-            let (can_read, remaining) = match db.can_make_free_reading(user_id, config.max_free_lifetime_readings).await {
-                Ok(res) => res,
-                Err(_) => (true, 10),
-            };
+            let access_check = db.check_access(user_id, config.daily_free_readings).await.unwrap_or(crate::models::UserAccessStatus {
+                can_access: false,
+                access_type: crate::models::AccessType::DailyFree,
+                is_premium: false,
+                premium_until: None,
+                daily_used_today: 1,
+                daily_limit: config.daily_free_readings,
+                energy_balance: db_user.energy_balance,
+            });
 
-            if !can_read {
-                let limit_text = format!(
-                    "🔒 <b>Лимит бесплатных раскладов исчерпан</b>\n\n\
-                    Вы использовали все <b>{}</b> подарочных раскладов.\n\
-                    Для продолжения оформите доступ в разделе <b>Тарифы</b> или обратитесь в поддержку <b>@Studia_taro</b>.",
-                    config.max_free_lifetime_readings
-                );
+            if !access_check.can_access {
+                let limit_text = "🔒 <b>Лимит бесплатных запросов исчерпан</b>\n\n\
+                    Вы уже использовали ваш <b>1 бесплатный запрос к ИИ</b> на сегодня.\n\n\
+                    ⏳ <i>Следующий бесплатный запрос откроется завтра в 00:00 UTC (запросы не копятся).</i>\n\n\
+                    💎 Чтобы продолжить без ограничений, выберите <b>Тариф</b> (пакет раскладов или Премиум-подписку):";
                 let _ = bot.edit_message_text(chat_id, message_id, limit_text)
                     .parse_mode(ParseMode::Html)
                     .reply_markup(tariffs_keyboard())
                     .await;
                 return Ok(());
             }
+
+            // Списываем право на запрос
+            let _ = db.consume_reading_charge(user_id, config.daily_free_readings).await;
 
             // ВСЕ КАРТЫ ВЫБРАНЫ: Генерация ИИ
             // Анимация вскрытия
@@ -745,25 +888,17 @@ pub async fn handle_callback(
             // Формируем красивый вывод
             let cards_list = cards_repr.iter().map(|c| format!("• <b>{}</b>", c)).collect::<Vec<_>>().join("\n");
             
-            let remaining_notice = if remaining > 1 {
-                format!("\n🎁 <i>Осталось бесплатных раскладов: {}</i>\n", remaining - 1)
-            } else {
-                "\n⚠️ <i>Это был ваш последний бесплатный расклад из 10.</i>\n".to_string()
-            };
-
             let final_text = format!(
                 "🔮 <b>ТАИНСТВО ТАРО СОВЕРШЕНО</b>\n\n\
                 📍 <b>Сфера</b>: {}\n\
                 ❓ <b>Вопрос</b>: {}\n\
-                🎴 <b>Выпавшие арканы</b>:\n{}\n\
-                {}\n\
+                🎴 <b>Выпавшие арканы</b>:\n{}\n\n\
                 ────────────────────\n\
                 {}\n\
                 ────────────────────",
                 sphere_title,
                 subtopic_title,
                 cards_list,
-                remaining_notice,
                 ai_response
             );
 
@@ -812,6 +947,32 @@ pub async fn handle_callback(
     }
 
     if let Some(sign_key) = data.strip_prefix("astro:") {
+        // Проверка лимитов для Астрологии
+        let access_check = db.check_access(user_id, config.daily_free_readings).await.unwrap_or(crate::models::UserAccessStatus {
+            can_access: false,
+            access_type: crate::models::AccessType::DailyFree,
+            is_premium: false,
+            premium_until: None,
+            daily_used_today: 1,
+            daily_limit: config.daily_free_readings,
+            energy_balance: db_user.energy_balance,
+        });
+
+        if !access_check.can_access {
+            let limit_text = "🔒 <b>Лимит бесплатных запросов исчерпан</b>\n\n\
+                Вы уже использовали ваш <b>1 бесплатный запрос к ИИ</b> на сегодня.\n\n\
+                ⏳ <i>Следующий бесплатный запрос откроется завтра в 00:00 UTC (запросы не копятся).</i>\n\n\
+                💎 Чтобы продолжить без ограничений, выберите <b>Тариф</b> (пакет раскладов или Премиум-подписку):";
+            let _ = bot.edit_message_text(chat_id, message_id, limit_text)
+                .parse_mode(ParseMode::Html)
+                .reply_markup(tariffs_keyboard())
+                .await;
+            return Ok(());
+        }
+
+        // Списываем право на запрос
+        let _ = db.consume_reading_charge(user_id, config.daily_free_readings).await;
+
         let sign = ZODIAC_SIGNS.iter().find(|z| z.key == sign_key);
         let sign_name = sign.map(|z| z.name).unwrap_or("Зодиак");
 
@@ -853,6 +1014,32 @@ pub async fn handle_callback(
 
     // 9. Игра Лила
     if data == "nav:leela" {
+        // Проверка лимитов для игры Лила
+        let access_check = db.check_access(user_id, config.daily_free_readings).await.unwrap_or(crate::models::UserAccessStatus {
+            can_access: false,
+            access_type: crate::models::AccessType::DailyFree,
+            is_premium: false,
+            premium_until: None,
+            daily_used_today: 1,
+            daily_limit: config.daily_free_readings,
+            energy_balance: db_user.energy_balance,
+        });
+
+        if !access_check.can_access {
+            let limit_text = "🔒 <b>Лимит бесплатных запросов исчерпан</b>\n\n\
+                Вы уже использовали ваш <b>1 бесплатный запрос к ИИ</b> на сегодня.\n\n\
+                ⏳ <i>Следующий бесплатный запрос откроется завтра в 00:00 UTC (запросы не копятся).</i>\n\n\
+                💎 Чтобы продолжить без ограничений, выберите <b>Тариф</b> (пакет раскладов или Премиум-подписку):";
+            let _ = bot.edit_message_text(chat_id, message_id, limit_text)
+                .parse_mode(ParseMode::Html)
+                .reply_markup(tariffs_keyboard())
+                .await;
+            return Ok(());
+        }
+
+        // Списываем право на запрос
+        let _ = db.consume_reading_charge(user_id, config.daily_free_readings).await;
+
         let (dice, cell) = LeelaGame::roll_and_get_cell();
 
         let loading_msg = format!(

@@ -59,17 +59,41 @@ mod tests {
             .await
             .expect("Пользователь должен создаваться");
         
-        assert_eq!(user.energy_balance, 10, "По умолчанию должно начисляться 10 бесплатных раскладов");
+        assert_eq!(user.energy_balance, 0, "По умолчанию дополнительный баланс 0");
 
-        let (can_read, remaining) = db.can_make_free_reading(user.telegram_id, 10).await.expect("Проверка баланса");
-        assert!(can_read);
-        assert_eq!(remaining, 10);
+        // 1. Проверяем доступ: 1 бесплатный запрос в день
+        let status = db.check_access(user.telegram_id, 1).await.expect("Проверка доступа");
+        assert!(status.can_access);
+        assert_eq!(status.access_type, crate::models::AccessType::DailyFree);
+        assert_eq!(status.daily_used_today, 0);
 
-        db.save_reading_history(user.telegram_id, "tarot", "one_card", None, "Шут", "Толкование").await.expect("Запись расклада в историю");
-        let (can_read_after, remaining_after) = db.can_make_free_reading(user.telegram_id, 10).await.expect("Проверка после списания");
-        assert!(can_read_after);
-        assert_eq!(remaining_after, 9, "Остаток должен уменьшиться до 9");
+        // 2. Списываем/фиксируем 1-й запрос
+        let consumed = db.consume_reading_charge(user.telegram_id, 1).await.expect("Списание заряда");
+        assert_eq!(consumed, crate::models::AccessType::DailyFree);
 
-        db.set_all_users_spreads(25).await.expect("Массовое изменение баланса из админки");
+        // 3. Проверяем доступ: бесплатный лимит на сегодня исчерпан, энергии нет -> can_access = false
+        let status2 = db.check_access(user.telegram_id, 1).await.expect("Проверка доступа 2");
+        assert!(!status2.can_access);
+        assert_eq!(status2.daily_used_today, 1);
+
+        // 4. Начисляем +5 дополнительной энергии
+        db.add_user_energy(user.telegram_id, 5).await.expect("Начисление энергии");
+        let status3 = db.check_access(user.telegram_id, 1).await.expect("Проверка доступа 3");
+        assert!(status3.can_access);
+        assert_eq!(status3.access_type, crate::models::AccessType::EnergyPackage);
+        assert_eq!(status3.energy_balance, 5);
+
+        // 5. Списываем платную энергию
+        let consumed2 = db.consume_reading_charge(user.telegram_id, 1).await.expect("Списание энергии");
+        assert_eq!(consumed2, crate::models::AccessType::EnergyPackage);
+        let user_updated = db.get_user_by_telegram_id(user.telegram_id).await.expect("Получить юзера").unwrap();
+        assert_eq!(user_updated.energy_balance, 4);
+
+        // 6. Выдаем Премиум на 30 дней -> безлимит
+        db.set_user_premium(user.telegram_id, 30).await.expect("Выдача премиума");
+        let status_prem = db.check_access(user.telegram_id, 1).await.expect("Проверка премиум");
+        assert!(status_prem.can_access);
+        assert_eq!(status_prem.access_type, crate::models::AccessType::Premium);
+        assert!(status_prem.is_premium);
     }
 }

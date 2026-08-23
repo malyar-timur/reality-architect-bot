@@ -11,8 +11,31 @@ pub struct User {
     pub is_offer_accepted: bool,
     pub offer_accepted_at: Option<String>,
     pub energy_balance: i64,
+    pub is_premium: bool,
+    pub premium_until: Option<String>,
     pub created_at: String,
     pub last_active_at: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AccessType {
+    /// Премиум пользователь — безлимит
+    Premium,
+    /// Бесплатный ежедневный запрос
+    DailyFree,
+    /// Использование дополнительного купленного пакета энергии
+    EnergyPackage,
+}
+
+#[derive(Debug, Clone)]
+pub struct UserAccessStatus {
+    pub can_access: bool,
+    pub access_type: AccessType,
+    pub is_premium: bool,
+    pub premium_until: Option<String>,
+    pub daily_used_today: i32,
+    pub daily_limit: i32,
+    pub energy_balance: i64,
 }
 
 #[allow(dead_code)]

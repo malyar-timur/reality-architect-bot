@@ -1,7 +1,7 @@
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 use anyhow::Result;
-use chrono::Utc;
-use crate::models::{DailyLimit, ReadingHistory, User};
+use chrono::{DateTime, Duration, Utc};
+use crate::models::{AccessType, ReadingHistory, User, UserAccessStatus};
 
 #[derive(Clone)]
 pub struct Db {
@@ -27,7 +27,9 @@ impl Db {
                 last_name TEXT,
                 is_offer_accepted BOOLEAN NOT NULL DEFAULT 0,
                 offer_accepted_at DATETIME,
-                energy_balance INTEGER NOT NULL DEFAULT 10,
+                energy_balance INTEGER NOT NULL DEFAULT 0,
+                is_premium BOOLEAN NOT NULL DEFAULT 0,
+                premium_until DATETIME,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 last_active_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
@@ -56,10 +58,12 @@ impl Db {
         .execute(&pool)
         .await?;
 
-        // Авто-миграция для старых баз данных
+        // Авто-миграция для существующих баз данных
         let _ = sqlx::query("ALTER TABLE users ADD COLUMN is_offer_accepted BOOLEAN NOT NULL DEFAULT 0;").execute(&pool).await;
         let _ = sqlx::query("ALTER TABLE users ADD COLUMN offer_accepted_at DATETIME;").execute(&pool).await;
-        let _ = sqlx::query("ALTER TABLE users ADD COLUMN energy_balance INTEGER NOT NULL DEFAULT 3;").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE users ADD COLUMN energy_balance INTEGER NOT NULL DEFAULT 0;").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE users ADD COLUMN is_premium BOOLEAN NOT NULL DEFAULT 0;").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE users ADD COLUMN premium_until DATETIME;").execute(&pool).await;
         let _ = sqlx::query("ALTER TABLE users ADD COLUMN last_active_at DATETIME;").execute(&pool).await;
 
         Ok(Self { pool })
@@ -82,7 +86,7 @@ impl Db {
                 first_name = excluded.first_name,
                 last_name = excluded.last_name,
                 last_active_at = CURRENT_TIMESTAMP
-            RETURNING id, telegram_id, username, first_name, last_name, is_offer_accepted, offer_accepted_at, energy_balance, created_at, last_active_at;
+            RETURNING id, telegram_id, username, first_name, last_name, is_offer_accepted, offer_accepted_at, energy_balance, is_premium, premium_until, created_at, last_active_at;
             "#
         )
         .bind(telegram_id)
@@ -95,10 +99,73 @@ impl Db {
         Ok(user)
     }
 
-    /// Установить точное количество раскладов всем или конкретному пользователю
+    /// Установить точное количество раскладов всем пользователям
     pub async fn set_all_users_spreads(&self, count: i64) -> Result<()> {
         sqlx::query("UPDATE users SET energy_balance = $1")
             .bind(count)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Добавить пакет раскладов конкретному пользователю
+    pub async fn add_user_energy(&self, telegram_id: i64, count: i64) -> Result<()> {
+        sqlx::query("UPDATE users SET energy_balance = energy_balance + $1 WHERE telegram_id = $2")
+            .bind(count)
+            .bind(telegram_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Выдать премиум статус на N дней (если уже есть премиум — продлевает)
+    pub async fn set_user_premium(&self, telegram_id: i64, days: i64) -> Result<String> {
+        self.grant_premium_days(telegram_id, days).await
+    }
+
+    /// Выдать премиум статус на N дней (если уже есть премиум — продлевает)
+    pub async fn grant_premium_days(&self, telegram_id: i64, days: i64) -> Result<String> {
+        let user = self.get_user_by_telegram_id(telegram_id).await?;
+        let now = Utc::now();
+
+        let base_time = match user {
+            Some(u) => {
+                if let Some(until_str) = u.premium_until {
+                    if let Ok(parsed) = DateTime::parse_from_rfc3339(&until_str) {
+                        let parsed_utc = parsed.with_timezone(&Utc);
+                        if parsed_utc > now {
+                            parsed_utc
+                        } else {
+                            now
+                        }
+                    } else {
+                        now
+                    }
+                } else {
+                    now
+                }
+            }
+            None => now,
+        };
+
+        let new_until = base_time + Duration::days(days);
+        let new_until_str = new_until.to_rfc3339();
+
+        sqlx::query(
+            "UPDATE users SET is_premium = 1, premium_until = $1 WHERE telegram_id = $2"
+        )
+        .bind(&new_until_str)
+        .bind(telegram_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(new_until_str)
+    }
+
+    /// Аннулировать премиум статус
+    pub async fn revoke_premium(&self, telegram_id: i64) -> Result<()> {
+        sqlx::query("UPDATE users SET is_premium = 0, premium_until = NULL WHERE telegram_id = $1")
+            .bind(telegram_id)
             .execute(&self.pool)
             .await?;
         Ok(())
@@ -115,7 +182,7 @@ impl Db {
     /// Получить пользователя по Telegram ID
     pub async fn get_user_by_telegram_id(&self, telegram_id: i64) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
-            "SELECT id, telegram_id, username, first_name, last_name, is_offer_accepted, offer_accepted_at, energy_balance, created_at, last_active_at FROM users WHERE telegram_id = $1"
+            "SELECT id, telegram_id, username, first_name, last_name, is_offer_accepted, offer_accepted_at, energy_balance, is_premium, premium_until, created_at, last_active_at FROM users WHERE telegram_id = $1"
         )
         .bind(telegram_id)
         .fetch_optional(&self.pool)
@@ -153,72 +220,152 @@ impl Db {
         Ok(())
     }
 
-    /// Проверка: осталось ли у пользователя право на бесплатный расклад (лимит 10 раскладов)
-    pub async fn can_make_free_reading(&self, telegram_id: i64, max_free: i32) -> Result<(bool, i32)> {
-        let count: i32 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM readings_history WHERE user_id = $1"
-        )
-        .bind(telegram_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        let remaining = max_free - count;
-        if remaining > 0 {
-            Ok((true, remaining))
-        } else {
-            // Проверяем баланс энергии если бесплатные 10 закончились
-            let user = self.get_user_by_telegram_id(telegram_id).await?;
-            let has_energy = user.map(|u| u.energy_balance > 0).unwrap_or(false);
-            Ok((has_energy, remaining))
-        }
-    }
-
-    /// Проверка и списание энергии или учет ежедневного лимита
-    pub async fn can_make_reading(&self, telegram_id: i64, daily_max: i32) -> Result<bool> {
+    /// Проверить статус доступа к ИИ (Премиум / 1 бесплатный в день / купленная энергия)
+    pub async fn check_access(&self, telegram_id: i64, daily_limit: i32) -> Result<UserAccessStatus> {
+        let user = self.get_user_by_telegram_id(telegram_id).await?;
         let today = Utc::now().format("%Y-%m-%d").to_string();
 
-        let limit: Option<DailyLimit> = sqlx::query_as(
-            "SELECT user_id, date, count FROM daily_limits WHERE user_id = $1 AND date = $2"
+        let count: i32 = sqlx::query_scalar(
+            "SELECT COALESCE(count, 0) FROM daily_limits WHERE user_id = $1 AND date = $2"
         )
         .bind(telegram_id)
         .bind(&today)
         .fetch_optional(&self.pool)
-        .await?;
+        .await?
+        .unwrap_or(0);
 
-        if let Some(daily) = limit {
-            if daily.count < daily_max {
-                return Ok(true);
+        let (is_active_premium, premium_until_str, energy_balance) = match &user {
+            Some(u) => {
+                let is_prem = if u.is_premium {
+                    if let Some(ref until_str) = u.premium_until {
+                        if let Ok(parsed) = DateTime::parse_from_rfc3339(until_str) {
+                            parsed.with_timezone(&Utc) > Utc::now()
+                        } else {
+                            false
+                        }
+                    } else {
+                        true
+                    }
+                } else {
+                    false
+                };
+                (is_prem, u.premium_until.clone(), u.energy_balance)
             }
-        } else {
-            return Ok(true);
+            None => (false, None, 0),
+        };
+
+        if is_active_premium {
+            return Ok(UserAccessStatus {
+                can_access: true,
+                access_type: AccessType::Premium,
+                is_premium: true,
+                premium_until: premium_until_str,
+                daily_used_today: count,
+                daily_limit,
+                energy_balance,
+            });
         }
 
-        // Если суточный лимит исчерпан, проверяем баланс энергии
-        let user = self.get_user_by_telegram_id(telegram_id).await?;
-        if let Some(u) = user {
-            return Ok(u.energy_balance > 0);
+        // Если есть бесплатный запрос на сегодня
+        if count < daily_limit {
+            return Ok(UserAccessStatus {
+                can_access: true,
+                access_type: AccessType::DailyFree,
+                is_premium: false,
+                premium_until: None,
+                daily_used_today: count,
+                daily_limit,
+                energy_balance,
+            });
         }
 
-        Ok(false)
+        // Если исчерпан суточный лимит, проверяем платный баланс энергии
+        if energy_balance > 0 {
+            return Ok(UserAccessStatus {
+                can_access: true,
+                access_type: AccessType::EnergyPackage,
+                is_premium: false,
+                premium_until: None,
+                daily_used_today: count,
+                daily_limit,
+                energy_balance,
+            });
+        }
+
+        // Лимит исчерпан
+        Ok(UserAccessStatus {
+            can_access: false,
+            access_type: AccessType::DailyFree,
+            is_premium: false,
+            premium_until: None,
+            daily_used_today: count,
+            daily_limit,
+            energy_balance,
+        })
     }
 
-    /// Инкремент счетчика раскладов за текущий день
-    pub async fn record_reading_usage(&self, telegram_id: i64) -> Result<()> {
+    /// Списать один запрос к ИИ (с учетом премиума, дневного лимита или баланса энергии)
+    pub async fn consume_reading_charge(&self, telegram_id: i64, daily_limit: i32) -> Result<AccessType> {
+        let status = self.check_access(telegram_id, daily_limit).await?;
         let today = Utc::now().format("%Y-%m-%d").to_string();
 
-        sqlx::query(
-            r#"
-            INSERT INTO daily_limits (user_id, date, count)
-            VALUES ($1, $2, 1)
-            ON CONFLICT(user_id, date) DO UPDATE SET count = count + 1;
-            "#
-        )
-        .bind(telegram_id)
-        .bind(today)
-        .execute(&self.pool)
-        .await?;
+        match status.access_type {
+            AccessType::Premium => {
+                // Премиум не списывает баланс, но записывает счетчик для статистики
+                sqlx::query(
+                    r#"
+                    INSERT INTO daily_limits (user_id, date, count)
+                    VALUES ($1, $2, 1)
+                    ON CONFLICT(user_id, date) DO UPDATE SET count = count + 1;
+                    "#
+                )
+                .bind(telegram_id)
+                .bind(today)
+                .execute(&self.pool)
+                .await?;
 
-        Ok(())
+                Ok(AccessType::Premium)
+            }
+            AccessType::DailyFree => {
+                // Использован бесплатный суточный запрос
+                sqlx::query(
+                    r#"
+                    INSERT INTO daily_limits (user_id, date, count)
+                    VALUES ($1, $2, 1)
+                    ON CONFLICT(user_id, date) DO UPDATE SET count = count + 1;
+                    "#
+                )
+                .bind(telegram_id)
+                .bind(today)
+                .execute(&self.pool)
+                .await?;
+
+                Ok(AccessType::DailyFree)
+            }
+            AccessType::EnergyPackage => {
+                // Списываем 1 расклад из купленного пакета
+                sqlx::query(
+                    "UPDATE users SET energy_balance = MAX(0, energy_balance - 1) WHERE telegram_id = $1"
+                )
+                .bind(telegram_id)
+                .execute(&self.pool)
+                .await?;
+
+                sqlx::query(
+                    r#"
+                    INSERT INTO daily_limits (user_id, date, count)
+                    VALUES ($1, $2, 1)
+                    ON CONFLICT(user_id, date) DO UPDATE SET count = count + 1;
+                    "#
+                )
+                .bind(telegram_id)
+                .bind(today)
+                .execute(&self.pool)
+                .await?;
+
+                Ok(AccessType::EnergyPackage)
+            }
+        }
     }
 
     /// Сохранить результат расклада в историю
@@ -246,8 +393,6 @@ impl Db {
         .execute(&self.pool)
         .await?
         .last_insert_rowid();
-
-        self.record_reading_usage(telegram_id).await?;
 
         Ok(id)
     }
