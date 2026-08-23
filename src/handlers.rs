@@ -855,7 +855,12 @@ pub async fn handle_callback(
     if data == "nav:leela" {
         let (dice, cell) = LeelaGame::roll_and_get_cell();
 
-        let _ = bot.edit_message_text(chat_id, message_id, format!("🎲 <i>Бросаем сакральный кубик... Выпало: <b>{}</b>!</i>", dice))
+        let loading_msg = format!(
+            "🎲 <b>Бросок кубика судьбы... Выпало: {}!</b>\n\n\
+            ⏳ <i>Подождите, Оракул Лилы раскладывает линии вашей судьбы и расшифровывает сакральное состояние «{}»...</i> ✨",
+            dice, cell.name
+        );
+        let _ = bot.edit_message_text(chat_id, message_id, loading_msg)
             .parse_mode(ParseMode::Html)
             .await;
         let _ = bot.send_chat_action(chat_id, ChatAction::Typing).await;
