@@ -20,17 +20,19 @@ HOST="192.124.181.128"
 USER="root"
 PASS="wo2oGKd2nNlnvkKqgzC6"
 REMOTE_DIR="/opt/telegram_bot"
+SSH_OPTS="-F /dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BindAddress=100.123.182.188"
+SCP_OPTS="-F /dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BindAddress=100.123.182.188"
 
 echo "3. Uploading archive to $HOST..."
-sshpass -p "$PASS" scp -F /dev/null -o StrictHostKeyChecking=no /tmp/telegram_bot_deploy.tar.gz "$USER@$HOST:/root/telegram_bot_deploy.tar.gz"
+sshpass -p "$PASS" scp $SCP_OPTS /tmp/telegram_bot_deploy.tar.gz "$USER@$HOST:/root/telegram_bot_deploy.tar.gz"
 
 echo "4. Unpacking and building docker on remote server..."
-sshpass -p "$PASS" ssh -F /dev/null -o StrictHostKeyChecking=no "$USER@$HOST" "mkdir -p $REMOTE_DIR/data && tar -xzf /root/telegram_bot_deploy.tar.gz -C $REMOTE_DIR && rm /root/telegram_bot_deploy.tar.gz && chmod +x $REMOTE_DIR/telegram_bot && cd $REMOTE_DIR && docker compose build"
+sshpass -p "$PASS" ssh $SSH_OPTS "$USER@$HOST" "mkdir -p $REMOTE_DIR/data && tar -xzf /root/telegram_bot_deploy.tar.gz -C $REMOTE_DIR && rm /root/telegram_bot_deploy.tar.gz && chmod +x $REMOTE_DIR/telegram_bot && cd $REMOTE_DIR && docker compose build"
 
 echo "5. Restarting containers if running..."
-sshpass -p "$PASS" ssh -F /dev/null -o StrictHostKeyChecking=no "$USER@$HOST" "cd $REMOTE_DIR && docker compose down -v -t 2 && docker compose up -d"
+sshpass -p "$PASS" ssh $SSH_OPTS "$USER@$HOST" "docker rm -f tarot_ai_bot 2>/dev/null; cd $REMOTE_DIR && docker compose up -d"
 
 echo "6. Checking remote status..."
-sshpass -p "$PASS" ssh -F /dev/null -o StrictHostKeyChecking=no "$USER@$HOST" "cd $REMOTE_DIR && docker compose ps"
+sshpass -p "$PASS" ssh $SSH_OPTS "$USER@$HOST" "cd $REMOTE_DIR && docker compose ps && docker logs --tail 30 tarot_ai_bot"
 
 echo "Done!"
