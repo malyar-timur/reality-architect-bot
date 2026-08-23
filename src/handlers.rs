@@ -772,12 +772,31 @@ pub async fn handle_callback(
             // Удаляем старое текстовое сообщение с кнопками выбора
             let _ = bot.delete_message(chat_id, message_id).await;
 
-            // Отправляем полноценное фото первой выпавшей карты с описанием и кнопками
-            let _ = bot.send_photo(chat_id, InputFile::url(first_card_image.parse().unwrap()))
-                .caption(final_text)
+            // Отправляем фото первой выпавшей карты с описанием и кнопками
+            let url = match first_card_image.parse() {
+                Ok(u) => u,
+                Err(e) => {
+                    error!("Invalid card URL {}: {:?}", first_card_image, e);
+                    let _ = bot.send_message(chat_id, final_text)
+                        .parse_mode(ParseMode::Html)
+                        .reply_markup(contact_tarologist_keyboard(None))
+                        .await;
+                    return Ok(());
+                }
+            };
+
+            if let Err(e) = bot.send_photo(chat_id, InputFile::url(url))
+                .caption(final_text.clone())
                 .parse_mode(ParseMode::Html)
                 .reply_markup(contact_tarologist_keyboard(None))
-                .await;
+                .await 
+            {
+                error!("Failed to send photo: {:?}, falling back to send_message", e);
+                let _ = bot.send_message(chat_id, final_text)
+                    .parse_mode(ParseMode::Html)
+                    .reply_markup(contact_tarologist_keyboard(None))
+                    .await;
+            }
             return Ok(());
         }
     }
