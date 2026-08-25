@@ -745,17 +745,21 @@ pub async fn handle_callback(
         return Ok(());
     }
 
-    // 5. Таро: Выбор подвопроса -> выбор глубины расклада
+    // 5. Таро: Выбор подвопроса -> сразу к выбору карт на сакральном алтаре (триада 3 карт)
     if let Some(rest) = data.strip_prefix("subtopic:") {
         let parts: Vec<&str> = rest.split(':').collect();
         if parts.len() == 2 {
             let sphere_key = parts[0];
             let subtopic_key = parts[1];
+            let spread_key = "triplet";
+            let count = 3;
 
-            let text = "🃏 <b>Выберите тип и глубину расклада:</b>";
+            let text = "🎴 <b>Колода разложена на сакральном алтаре.</b>\n\n\
+                Сделайте вдох, сфокусируйтесь на вопросе и выберите пальцем <b>3</b> карты судьбы:";
+
             let _ = bot.edit_message_text(chat_id, message_id, text)
                 .parse_mode(ParseMode::Html)
-                .reply_markup(tarot_spreads_keyboard(sphere_key, subtopic_key))
+                .reply_markup(tarot_pick_cards_keyboard(sphere_key, subtopic_key, spread_key, count, &[]))
                 .await;
             return Ok(());
         }

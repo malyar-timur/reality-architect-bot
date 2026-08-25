@@ -18,7 +18,7 @@ tar -czf /tmp/telegram_bot_deploy.tar.gz -C /tmp/telegram_bot_deploy .
 
 HOST="192.124.181.128"
 USER="root"
-PASS="wo2oGKd2nNlnvkKqgzC6"
+PASS='p_oXUl7zXCpy1Z$ZX(1A'
 REMOTE_DIR="/opt/telegram_bot"
 SSH_OPTS="-F /dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BindAddress=100.123.182.188"
 SCP_OPTS="-F /dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BindAddress=100.123.182.188"

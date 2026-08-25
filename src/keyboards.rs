@@ -134,7 +134,8 @@ pub fn tarot_pick_cards_keyboard(
     rows.push(row1);
     rows.push(row2);
     rows.push(vec![
-        InlineKeyboardButton::callback("❌ Отмена", "nav:main_menu"),
+        InlineKeyboardButton::callback("◀️ Назад", format!("sphere:{}", sphere_key)),
+        InlineKeyboardButton::callback("🏠 Меню", "nav:main_menu"),
     ]);
 
     InlineKeyboardMarkup::new(rows)
