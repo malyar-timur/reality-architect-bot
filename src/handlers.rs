@@ -361,13 +361,54 @@ pub async fn handle_callback(
     }
 
     if data == "nav:tariffs" {
-        let text = "💎 <b>Тарифы и подписка ORACULUM</b>\n\n\
-            Пополняйте запасы энергии или активируйте безлимитный доступ к раскладам ИИ-Оракула:\n\n\
+        let status = db.check_access(user_id, config.daily_free_readings).await.unwrap_or(crate::models::UserAccessStatus {
+            can_access: true,
+            access_type: crate::models::AccessType::DailyFree,
+            is_premium: false,
+            premium_until: None,
+            daily_used_today: 0,
+            daily_limit: config.daily_free_readings,
+            energy_balance: db_user.energy_balance,
+        });
+
+        let current_status = if status.is_premium {
+            let until = status.premium_until.as_deref().unwrap_or("активен");
+            format!("⭐ <b>Ваш статус:</b> ПРЕМИУМ ♾ (до {})", until)
+        } else {
+            let free_state = if status.daily_used_today < status.daily_limit {
+                "✅ 1 из 1 (готов к использованию)"
+            } else {
+                "❌ 0 из 1 (исчерпан, откроется в 00:00 UTC)"
+            };
+            format!(
+                "👤 <b>Ваш статус:</b> Базовый доступ\n\
+                🎁 <b>Бесплатный расклад сегодня:</b> {}\n\
+                ⚡ <b>Дополнительные расклады на балансе:</b> <b>{}</b>",
+                free_state, status.energy_balance
+            )
+        };
+
+        let text = format!(
+            "💎 <b>Тарифы и возможности ORACULUM</b>\n\n\
+            {}\n\n\
+            ━━━━━━━━━━━━━━━━━━━━\n\
+            📜 <b>Как устроена система:</b>\n\
+            • <b>1 бесплатный расклад каждый день</b> доступен каждому искателю (Таро, Астрология или Лила). Он обновляется каждые 24 часа в 00:00 UTC и не сгорает, но и не копится.\n\
+            • <b>Пакеты раскладов</b> не имеют срока действия — они хранятся на балансе и расходуются только тогда, когда ежедневный бесплатный расклад уже использован.\n\
+            • <b>Премиум-подписка</b> снимает любые лимиты и открывает бесконечные расклады и глубокие консультации с ИИ на весь оплаченный период.\n\n\
+            ━━━━━━━━━━━━━━━━━━━━\n\
+            🔮 <b>Доступные варианты пополнения:</b>\n\n\
             • ⚡ <b>Пакет «5 Раскладов»</b> — 290 ₽\n\
-            • 🌟 <b>Месячный безлимит «Адепт»</b> — 790 ₽ / месяц\n\
-            • 💫 <b>Безлимит «Маг» (3 месяца)</b> — 1990 ₽\n\
-            • 🔮 <b>Безлимит «Верховная Жрица» (год)</b> — 5990 ₽\n\n\
-            <i>Оплата принимается через СБП, карты РФ и ЮMoney. Для подключения напишите в поддержку @Studia_taro</i>.";
+              <i>(расклады навсегда сохраняются на балансе)</i>\n\n\
+            • 🌟 <b>Безлимит «Адепт» (1 месяц)</b> — 790 ₽\n\
+              <i>(полный безлимит на 30 дней)</i>\n\n\
+            • 💫 <b>Безлимит «Маг» (3 месяца)</b> — 1 990 ₽\n\
+              <i>(полный безлимит на 90 дней со скидкой)</i>\n\n\
+            • 👑 <b>Безлимит «Архитектор» (1 год)</b> — 5 990 ₽\n\
+              <i>(максимальный статус и безлимит на 365 дней)</i>\n\n\
+            💳 <i>Оплата принимается через СБП, карты РФ и ЮMoney. Выберите тариф ниже для подключения:</i>",
+            current_status
+        );
         let _ = bot.edit_message_text(chat_id, message_id, text)
             .parse_mode(ParseMode::Html)
             .reply_markup(tariffs_keyboard())
@@ -558,11 +599,36 @@ pub async fn handle_callback(
             return Ok(());
         }
 
+        let access_check = db.check_access(user_id, config.daily_free_readings).await.unwrap_or(crate::models::UserAccessStatus {
+            can_access: true,
+            access_type: crate::models::AccessType::DailyFree,
+            is_premium: false,
+            premium_until: None,
+            daily_used_today: 0,
+            daily_limit: config.daily_free_readings,
+            energy_balance: db_user.energy_balance,
+        });
+
+        let balance_info = if access_check.is_premium {
+            let until = access_check.premium_until.as_deref().unwrap_or("активна");
+            format!("⭐ <b>Статус:</b> ПРЕМИУМ ♾ (до {})\n🔮 <b>Расклады:</b> Безлимитно", until)
+        } else {
+            let free_state = if access_check.daily_used_today < access_check.daily_limit {
+                "✅ 1 из 1 (доступен)"
+            } else {
+                "❌ 0 из 1 (использован сегодня)"
+            };
+            format!(
+                "🎁 <b>Бесплатный расклад:</b> {}\n⚡ <b>Доп. расклады:</b> <b>{}</b>\n⏳ <i>Бесплатный запрос обновляется каждые сутки в 00:00 UTC</i>",
+                free_state, access_check.energy_balance
+            )
+        };
+
         let text = format!(
             "🏛 <b>Главный зал Оракула</b>\n\n\
-            Ваш запас энергии: ⚡ <b>{}</b>\n\
+            {}\n\n\
             Выберите желаемое таинство:",
-            db_user.energy_balance
+            balance_info
         );
         
         // Попытка отредактировать сообщение (если это текст) или отправить новое
