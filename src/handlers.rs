@@ -528,9 +528,10 @@ pub async fn handle_callback(
         let (card, is_reversed) = &drawn[0];
         let orientation = if *is_reversed { " (Перевернутая)" } else { " (Прямая)" };
         
-        let wait_msg = bot.send_message(chat_id, "🌙 <i>Оракул открывает Аркан вашего сегодняшнего дня...</i>")
+        let _ = bot.edit_message_text(chat_id, message_id, "🌙 <i>Оракул открывает Аркан вашего сегодняшнего дня и считывает знаки судьбы...</i>")
             .parse_mode(ParseMode::Html)
             .await;
+        let _ = bot.send_chat_action(chat_id, ChatAction::Typing).await;
 
         let prompt = format!(
             "Расклад 'Карта дня'. Выпала карта: {}{}. Дай краткий, мудрый совет, предостережение и фокус внимания на день.",
@@ -552,12 +553,8 @@ pub async fn handle_callback(
             &ai_result,
         ).await;
 
-        if let Ok(m) = wait_msg {
-            let _ = bot.delete_message(chat_id, m.id).await;
-        }
-
-        let caption = format!(
-            "🌙 <b>Оракул открывает Аркан вашего сегодняшнего дня: {}{}</b>\n\n\
+        let full_text = format!(
+            "🌙 <b>АРКАН ДНЯ: {}{}</b>\n\n\
             🔮 <b>Совет Оракула:</b>\n\
             {}\n\n\
             <i>Ключевые энергии: {}</i>",
@@ -567,24 +564,10 @@ pub async fn handle_callback(
             card.keywords
         );
 
-        if let Ok(url) = card.image_url.parse() {
-            let res = bot.send_photo(chat_id, teloxide::types::InputFile::url(url))
-                .caption(caption.clone())
-                .parse_mode(ParseMode::Html)
-                .reply_markup(main_menu_keyboard())
-                .await;
-            if res.is_err() {
-                let _ = bot.send_message(chat_id, caption)
-                    .parse_mode(ParseMode::Html)
-                    .reply_markup(main_menu_keyboard())
-                    .await;
-            }
-        } else {
-            let _ = bot.send_message(chat_id, caption)
-                .parse_mode(ParseMode::Html)
-                .reply_markup(main_menu_keyboard())
-                .await;
-        }
+        let _ = bot.edit_message_text(chat_id, message_id, full_text)
+            .parse_mode(ParseMode::Html)
+            .reply_markup(main_menu_keyboard())
+            .await;
         return Ok(());
     }
 
