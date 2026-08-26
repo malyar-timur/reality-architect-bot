@@ -14,9 +14,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Копируем скомпилированный release бинарник
+# Копируем скомпилированный release бинарник и ассеты
 COPY telegram_bot /app/telegram_bot
 RUN chmod +x /app/telegram_bot
+COPY assets /app/assets
 
 # Папка для постоянных данных (SQLite БД и логи)
 RUN mkdir -p /app/data

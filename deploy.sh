@@ -13,6 +13,7 @@ cp docker-compose.yml /tmp/telegram_bot_deploy/
 cp .env /tmp/telegram_bot_deploy/
 cp .env.example /tmp/telegram_bot_deploy/
 cp DEPLOY.md /tmp/telegram_bot_deploy/
+cp -r assets /tmp/telegram_bot_deploy/
 cp -r src Cargo.toml Cargo.lock /tmp/telegram_bot_deploy/
 tar -czf /tmp/telegram_bot_deploy.tar.gz -C /tmp/telegram_bot_deploy .
 
