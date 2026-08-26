@@ -181,23 +181,17 @@ pub fn astrology_signs_keyboard() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(rows)
 }
 
-/// Клавиатура экрана "Связаться с тарологом"
-pub fn contact_tarologist_keyboard(payment_url: Option<&str>) -> InlineKeyboardMarkup {
-    let mut rows = Vec::new();
-    if let Some(url) = payment_url {
-        rows.push(vec![
-            InlineKeyboardButton::url("💳 Оплатить 100 ₽ (ЮKassa / ЮMoney)", url.parse().unwrap()),
-        ]);
-    } else {
-        rows.push(vec![
-            InlineKeyboardButton::callback("💳 Оплатить 100 ₽", "pay:tarologist_consultation"),
-        ]);
-    }
-    rows.push(vec![
-        InlineKeyboardButton::callback("🔮 Сделать ещё расклад", "nav:tarot_spheres"),
-        InlineKeyboardButton::callback("🏠 Главное меню", "nav:main_menu"),
-    ]);
-    InlineKeyboardMarkup::new(rows)
+/// Клавиатура экрана после завершения расклада Таро
+pub fn after_tarot_keyboard() -> InlineKeyboardMarkup {
+    InlineKeyboardMarkup::new(vec![
+        vec![
+            InlineKeyboardButton::callback("🔮 Сделать ещё расклад", "nav:tarot_spheres"),
+        ],
+        vec![
+            InlineKeyboardButton::callback("💎 Тарифы и Энергия", "nav:tariffs"),
+            InlineKeyboardButton::callback("🏠 Главное меню", "nav:main_menu"),
+        ],
+    ])
 }
 
 /// Клавиатура экрана "Тарифы и подписка"

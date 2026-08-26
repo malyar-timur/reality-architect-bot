@@ -487,14 +487,11 @@ pub async fn handle_callback(
     }
 
     if data == "pay:tarologist_consultation" {
-        // Заглушка генерации ссылки оплаты ЮKassa / ЮMoney
-        let text = "🧿 <b>Оплата личного обращения к тарологу</b>\n\n\
-            Сумма к оплате: <b>100 ₽</b>\n\n\
-            Нажмите кнопку ниже для безопасной оплаты через ЮMoney / СБП / Карту:";
-        let yoomoney_mock_url = "https://yoomoney.ru";
+        let text = "🧿 <b>Личное обращение к тарологу</b>\n\n\
+            Для заказа персональной консультации напишите нашему мастеру: <b>@Studia_taro</b>";
         let _ = bot.edit_message_text(chat_id, message_id, text)
             .parse_mode(ParseMode::Html)
-            .reply_markup(contact_tarologist_keyboard(Some(yoomoney_mock_url)))
+            .reply_markup(support_keyboard())
             .await;
         return Ok(());
     }
@@ -992,7 +989,7 @@ pub async fn handle_callback(
                     error!("Invalid card URL {}: {:?}", first_card_image, e);
                     let _ = bot.send_message(chat_id, final_text)
                         .parse_mode(ParseMode::Html)
-                        .reply_markup(contact_tarologist_keyboard(None))
+                        .reply_markup(after_tarot_keyboard())
                         .await;
                     return Ok(());
                 }
@@ -1001,13 +998,13 @@ pub async fn handle_callback(
             if let Err(e) = bot.send_photo(chat_id, InputFile::url(url))
                 .caption(final_text.clone())
                 .parse_mode(ParseMode::Html)
-                .reply_markup(contact_tarologist_keyboard(None))
+                .reply_markup(after_tarot_keyboard())
                 .await 
             {
                 error!("Failed to send photo: {:?}, falling back to send_message", e);
                 let _ = bot.send_message(chat_id, final_text)
                     .parse_mode(ParseMode::Html)
-                    .reply_markup(contact_tarologist_keyboard(None))
+                    .reply_markup(after_tarot_keyboard())
                     .await;
             }
             return Ok(());
