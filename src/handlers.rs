@@ -409,16 +409,14 @@ pub async fn handle_callback(
             💳 <i>Оплата принимается через СБП, карты РФ и ЮMoney. Выберите тариф ниже для подключения:</i>",
             current_status
         );
-        let banner_path = std::path::Path::new("assets/tariffs.jpg");
-        if banner_path.exists() {
-            let _ = bot.delete_message(chat_id, message_id).await;
-            let _ = bot.send_photo(chat_id, teloxide::types::InputFile::file(banner_path))
-                .caption(text)
-                .parse_mode(ParseMode::Html)
-                .reply_markup(tariffs_keyboard())
-                .await;
-        } else {
-            let _ = bot.edit_message_text(chat_id, message_id, text)
+
+        let edit_res = bot.edit_message_text(chat_id, message_id, text.clone())
+            .parse_mode(ParseMode::Html)
+            .reply_markup(tariffs_keyboard())
+            .await;
+
+        if edit_res.is_err() {
+            let _ = bot.send_message(chat_id, text)
                 .parse_mode(ParseMode::Html)
                 .reply_markup(tariffs_keyboard())
                 .await;
